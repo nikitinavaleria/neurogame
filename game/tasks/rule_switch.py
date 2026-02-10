@@ -54,15 +54,19 @@ class RuleSwitchTask(TaskBase):
         screen.blit(cue, (x, y + 28))
 
         if self.rule == "COLOR":
-            map_hint = "ЦВЕТ: красный=F/A, синий=J/O"
+            map_hint = "F - красный, J - синий"
         else:
-            map_hint = "ФОРМА: круг=F/A, квадрат=J/O"
+            map_hint = "F - круг, J - квадрат"
         hint_map = ctx.font_small.render(map_hint, True, ctx.color_main)
         screen.blit(hint_map, (x, y + min(56, max_h // 3)))
 
         color = COLORS[self.color]
-        cy = ctx.rect.y + ctx.rect.height // 2 + 6
-        size = max(28, min(ctx.rect.width, ctx.rect.height) // 5)
+        top_limit = y + min(56, max_h // 3) + 26
+        bottom_limit = y + max_h - 36
+        shape_area_h = max(44, bottom_limit - top_limit)
+        cy = top_limit + shape_area_h // 2
+        size = min(ctx.rect.width // 6, shape_area_h // 2 - 4)
+        size = max(18, size)
         if self.shape == "circle":
             pygame.draw.circle(screen, color, (center_x, cy), size)
         else:
@@ -70,5 +74,5 @@ class RuleSwitchTask(TaskBase):
             rect.center = (center_x, cy)
             pygame.draw.rect(screen, color, rect)
 
-        hint = ctx.font_small.render("Нажми F/J (или A/O)", True, ctx.color_main)
+        hint = ctx.font_small.render("Нажми по текущему правилу", True, ctx.color_main)
         screen.blit(hint, (x, y + max_h - 22))

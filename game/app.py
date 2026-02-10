@@ -56,14 +56,12 @@ class GameApp:
         self.session_logger = JsonlLogger("data/sessions.jsonl")
         self.session_id = f"s{int(time.time())}"
         self.results: List[TaskResult] = []
-        self.stability = 1.0
+        self.stability = 0.0
         self.running = True
         self.started = False
         self.last_feedback_ms: int = 0
         self.last_feedback_text: str = ""
         self.last_feedback_ok: bool = True
-        self.last_key_ms: int = 0
-        self.last_key_text: str = ""
         self.selected_mode = self.session.adaptation_mode
 
     def run(self) -> None:
@@ -76,11 +74,6 @@ class GameApp:
                     self.running = False
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.running = False
-                if event.type == pygame.KEYDOWN:
-                    self.last_key_ms = now_ms
-                    name = pygame.key.name(event.key)
-                    char = (event.unicode or "").strip()
-                    self.last_key_text = f"Клавиша: {name} {f'({char})' if char else ''}"
                 if self.started:
                     result = self.task_manager.handle_event(event, now_ms)
                     if result is not None:
@@ -88,10 +81,14 @@ class GameApp:
                 else:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                         self.started = True
-                    if event.type == pygame.KEYDOWN and event.key == pygame.K_b:
-                        self.selected_mode = "baseline"
-                    if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                        self.selected_mode = "ppo"
+                    if event.type == pygame.KEYDOWN and (
+                        event.key == pygame.K_b or (event.unicode or "").lower() == "в"
+                    ):
+                        if self.selected_mode == "baseline":
+                            if Path(self.session.rl_model_path).exists():
+                                self.selected_mode = "ppo"
+                        else:
+                            self.selected_mode = "baseline"
 
             if self.started:
                 results = self.task_manager.update(now_ms)
@@ -194,27 +191,27 @@ class GameApp:
     def _render(self, now_ms: int) -> None:
         self.ui.clear()
         self.ui.draw_frame()
-        self.ui.draw_title("Deep Space Ops")
 
-        active = self.task_manager.get_active_summary(now_ms)
         focused = self.task_manager.get_focused_task()
-        focused_index = None
+        focused_name = None
+        focused_time_left = None
         if focused is not None:
-            focused_index = self.task_manager.active_tasks.index(focused)
+            focused_name = self._task_title(focused.spec.task_id)
+            focused_time_left = max(0, focused.spec.deadline_ms - now_ms)
+        show_timeout_alert = self.last_feedback_text == "Слишком поздно" and now_ms - self.last_feedback_ms <= 900
 
         if self.started:
+            self.ui.draw_title("Deep Space Ops")
             self.ui.draw_status(
                 stability=self.stability,
-                load=len(active),
                 tasks_done=self.task_manager.tasks_completed,
                 total_tasks=self.session.total_tasks,
                 level=self.current_level,
             )
-            self.ui.draw_task_list(active, focused_index)
-            self.ui.draw_footer("F/J или A/O: действие | ESC: выход")
+            self.ui.draw_focus_panel(focused_name, focused_time_left, show_timeout_alert)
+            self.ui.draw_help_panel()
             self._render_task_panels(focused)
             self._render_feedback(now_ms)
-            self._render_key_debug(now_ms)
         else:
             self._render_start_screen()
 
@@ -265,63 +262,125 @@ class GameApp:
         full.fill((6, 8, 14, 220))
         self.screen.blit(full, (0, 0))
 
-        box_w = int(self.ui.center_panel.width * 1.35)
-        box_h = int(self.ui.center_panel.height * 1.1)
-        box_x = (self.ui.w - box_w) // 2
-        box_y = (self.ui.h - box_h) // 2
-        box = pygame.Rect(box_x, box_y, box_w, box_h)
-        pygame.draw.rect(self.screen, self.ui.theme.panel, box, border_radius=12)
-        pygame.draw.rect(self.screen, self.ui.theme.border, box, width=2, border_radius=12)
+        title_shadow = self.ui.font_big.render("Deep Space Ops", True, (12, 20, 40))
+        title_main = self.ui.font_big.render("Deep Space Ops", True, self.ui.theme.accent)
+        title_rect = title_main.get_rect(center=(self.ui.w // 2, 48))
+        self.screen.blit(title_shadow, (title_rect.x + 2, title_rect.y + 2))
+        self.screen.blit(title_main, title_rect)
+
+        main_top = 84
+        main_bottom = self.ui.h - 20
+        main_height = max(240, main_bottom - main_top)
+
+        left_box = pygame.Rect(
+            self.ui.left_panel.x,
+            main_top,
+            self.ui.left_panel.width,
+            main_height,
+        )
+        center_box = pygame.Rect(
+            self.ui.center_panel.x,
+            main_top,
+            self.ui.center_panel.width,
+            main_height,
+        )
+        right_full_box = pygame.Rect(
+            self.ui.right_panel.x,
+            main_top,
+            self.ui.right_panel.width,
+            main_height,
+        )
+        right_gap = 14
+        right_top_h = (right_full_box.height - right_gap) // 2
+        right_top_box = pygame.Rect(
+            right_full_box.x,
+            right_full_box.y,
+            right_full_box.width,
+            right_top_h,
+        )
+        right_bottom_box = pygame.Rect(
+            right_full_box.x,
+            right_top_box.bottom + 14,
+            right_full_box.width,
+            right_full_box.height - right_top_h - right_gap,
+        )
+
+        for rect in [center_box, left_box, right_top_box, right_bottom_box]:
+            pygame.draw.rect(self.screen, self.ui.theme.panel, rect, border_radius=12)
+            pygame.draw.rect(self.screen, self.ui.theme.border, rect, width=2, border_radius=12)
 
         title = self.ui.font_mid.render("Инструкция", True, self.ui.theme.accent)
-        self.screen.blit(title, (box_x + 20, box_y + 16))
+        self.screen.blit(title, (center_box.x + 20, center_box.y + 16))
 
-        lines = [
-            "Ты оператор станции. Внимательно выполняй задачи.",
-            "Клавиши: F/J (или A/O) — ответы.",
-            "ESC — выход из игры.",
+        center_lines = [
+            "Ты - оператор космической станции.",
+            "Внимательно выполняй задачи,",
+            "ведь именно от тебя зависит успех операции...",
             "",
-            "Режим адаптации:",
-            f"[B] baseline  |  [R] RL (PPO)  |  текущий: {self.selected_mode}",
-            self._rl_warning(),
-            "",
-            "Задачи:",
-            "1) Сравнение кодов: F = совпадает, J = не совпадает.",
-            "2) Память: запомни строку, затем F = да, J = нет.",
-            "3) Смена правила: смотри правило ЦВЕТ/ФОРМА.",
-            "",
-            "Нажми ПРОБЕЛ, чтобы начать.",
+            "Нажми ПРОБЕЛ, чтобы начать",
         ]
-        yy = box_y + 50
-        for line in lines:
-            if line == "Задачи:":
-                color = self.ui.theme.accent
-            elif line.startswith("Внимание"):
-                color = self.ui.theme.alert
-            else:
-                color = self.ui.theme.text
-            surf = self.ui.font_small.render(line, True, color)
-            self.screen.blit(surf, (box_x + 20, yy))
+        yy = center_box.y + 56
+        for line in center_lines:
+            surf = self.ui.font_small.render(line, True, self.ui.theme.text)
+            self.screen.blit(surf, (center_box.x + 20, yy))
+            yy += 24
+
+        mode_title = self.ui.font_small.render("Текущий режим адаптации:", True, self.ui.theme.accent)
+        self.screen.blit(mode_title, (right_top_box.x + 16, right_top_box.y + 16))
+        mode_label = "базовый" if self.selected_mode == "baseline" else "адаптивный"
+        mode_value = self.ui.font_mid.render(mode_label, True, self.ui.theme.text)
+        self.screen.blit(mode_value, (right_top_box.x + 16, right_top_box.y + 50))
+        switch_label = self.ui.font_small.render("Сменить: В", True, self.ui.theme.text)
+        self.screen.blit(switch_label, (right_top_box.x + 16, right_top_box.y + 88))
+
+        warning = self._rl_warning()
+        if warning:
+            warning_surf = self.ui.font_tiny.render(warning, True, self.ui.theme.alert)
+            self.screen.blit(warning_surf, (right_top_box.x + 16, right_top_box.y + 120))
+
+        rules_title = self.ui.font_small.render("Правила игры:", True, self.ui.theme.accent)
+        self.screen.blit(rules_title, (right_bottom_box.x + 16, right_bottom_box.y + 16))
+        rules_lines = [
+            "Нажимай на клавиши F/J",
+            "для ответов на вопросы",
+            "Нажимай на ESC,",
+            "если хочешь покинуть игру",
+        ]
+        yy = right_bottom_box.y + 48
+        for line in rules_lines:
+            surf = self.ui.font_small.render(line, True, self.ui.theme.text)
+            self.screen.blit(surf, (right_bottom_box.x + 16, yy))
+            yy += 24
+
+        tasks_title = self.ui.font_small.render("Задачи", True, self.ui.theme.accent)
+        self.screen.blit(tasks_title, (left_box.x + 16, left_box.y + 16))
+        task_lines = [
+            "1. Сравнение кодов",
+            "2. Память последовательностей",
+            "3. Переключение правил",
+        ]
+        yy = left_box.y + 48
+        for line in task_lines:
+            surf = self.ui.font_small.render(line, True, self.ui.theme.text)
+            self.screen.blit(surf, (left_box.x + 16, yy))
             yy += 24
 
     def _rl_warning(self) -> str:
-        if self.selected_mode != "ppo":
-            return ""
         if Path(self.session.rl_model_path).exists():
             return ""
-        return "Внимание: модель PPO не найдена, будет использован baseline."
+        return "Агент не доступен, смена невозможна"
 
     def _render_feedback(self, now_ms: int) -> None:
-        if now_ms - self.last_feedback_ms > 350:
+        if now_ms - self.last_feedback_ms > 500:
             return
-        surf = self.ui.font_small.render(self.last_feedback_text, True, self.ui.theme.accent)
-        self.screen.blit(surf, (self.ui.center_panel.x + 20, self.ui.center_panel.y + 60))
-
-    def _render_key_debug(self, now_ms: int) -> None:
-        if now_ms - self.last_key_ms > 700:
+        if self.last_feedback_text == "Слишком поздно":
             return
-        surf = self.ui.font_small.render(self.last_key_text, True, self.ui.theme.text)
-        self.screen.blit(surf, (self.ui.center_panel.x + 20, self.ui.center_panel.y + 90))
+        color = self.ui.theme.accent if self.last_feedback_ok else self.ui.theme.alert
+        shadow = self.ui.font_big.render(self.last_feedback_text, True, (10, 16, 28))
+        text = self.ui.font_big.render(self.last_feedback_text, True, color)
+        rect = text.get_rect(center=self.ui.center_panel.center)
+        self.screen.blit(shadow, (rect.x + 2, rect.y + 2))
+        self.screen.blit(text, rect)
 
     def _finalize_session(self) -> None:
         if not self.results:
@@ -350,6 +409,14 @@ class GameApp:
             "time_pressure": g.time_pressure,
             "task_mix": g.task_mix,
         }
+
+    @staticmethod
+    def _task_title(task_id: str) -> str:
+        return {
+            "compare_codes": "Сравнение кодов",
+            "sequence_memory": "Память",
+            "rule_switch": "Смена правила",
+        }.get(task_id, task_id)
 
     def _encode_action(self, prev_level: int, prev_tempo: int) -> tuple:
         delta_level = max(-1, min(1, self.current_level - prev_level))

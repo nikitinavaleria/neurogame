@@ -12,13 +12,14 @@ def apply_level(base: DifficultyConfig, level: int) -> DifficultyConfig:
     # Сложность задач: чем выше уровень, тем длиннее/сложнее.
     code_len = min(7, base.compare.code_len + (level // 2))
     similarity = min(0.7, base.compare.similarity_rate + 0.02 * (level - 1))
-    compare_time = max(900, int(base.compare.time_limit_ms * speed_factor))
+    first_level_bonus = 1.25 if level == 1 else 1.0
+    compare_time = max(900, int(base.compare.time_limit_ms * speed_factor * first_level_bonus))
 
     seq_len = min(8, base.memory.seq_len + (level // 2))
-    memory_time = max(1200, int(base.memory.time_limit_ms * speed_factor))
+    memory_time = max(1200, int(base.memory.time_limit_ms * speed_factor * first_level_bonus))
 
     switch_rate = min(0.6, base.switch.rule_switch_rate + 0.03 * (level - 1))
-    switch_time = max(900, int(base.switch.time_limit_ms * speed_factor))
+    switch_time = max(900, int(base.switch.time_limit_ms * speed_factor * first_level_bonus))
 
     return DifficultyConfig(
         global_params=replace(

@@ -55,13 +55,6 @@ class TaskManager:
             return None
         return self.active_tasks[0]
 
-    def get_active_summary(self, now_ms: int) -> List[tuple]:
-        summary = []
-        for task in self.active_tasks:
-            time_left = max(0, task.deadline_ms - now_ms)
-            summary.append((self._task_name(task.spec.task_id), time_left))
-        return summary
-
     def is_done(self) -> bool:
         return self.tasks_completed >= self.total_tasks
 
@@ -140,12 +133,3 @@ class TaskManager:
             payload={"rule": self.current_rule},
         )
         return RuleSwitchTask(spec, self.rng)
-
-    @staticmethod
-    def _task_name(task_id: str) -> str:
-        names = {
-            "compare_codes": "Сравнение кодов",
-            "sequence_memory": "Память",
-            "rule_switch": "Смена правила",
-        }
-        return names.get(task_id, task_id)

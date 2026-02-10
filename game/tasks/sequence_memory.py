@@ -51,12 +51,10 @@ class SequenceMemoryTask(TaskBase):
             return
 
         if now_ms < self.query_ready_ms:
-            wait = ctx.font_small.render("Подожди... скоро вопрос", True, ctx.color_main)
-            screen.blit(wait, (x, y + min(84, max_h // 2)))
             return
 
         question = f"Был ли '{self.query_symbol}'?"
         surf = ctx.font_mid.render(question, True, ctx.color_main)
         screen.blit(surf, (x, y + min(64, max_h // 3)))
-        hint = ctx.font_small.render("F/A = да, J/O = нет", True, ctx.color_main)
+        hint = ctx.font_small.render("F - да, J - нет", True, ctx.color_main)
         screen.blit(hint, (x, y + max_h - 22))

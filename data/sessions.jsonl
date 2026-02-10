@@ -1,1 +1,13 @@
 {"session_id": "s1770137043", "total_tasks": 10, "accuracy_total": 0.5, "mean_rt": 2295.6, "rt_variance": 1762153.84, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770721741", "total_tasks": 18, "accuracy_total": 0.1111111111111111, "mean_rt": 3221.1666666666665, "rt_variance": 1409203.138888889, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770724274", "total_tasks": 68, "accuracy_total": 0.10294117647058823, "mean_rt": 4830.558823529412, "rt_variance": 2320612.599480969, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770724883", "total_tasks": 34, "accuracy_total": 0.0, "mean_rt": 4200.85294117647, "rt_variance": 880372.7724913495, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770725156", "total_tasks": 37, "accuracy_total": 0.0, "mean_rt": 4360.621621621622, "rt_variance": 1091492.2352081812, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770725625", "total_tasks": 33, "accuracy_total": 0.0, "mean_rt": 4174.575757575758, "rt_variance": 865003.9412304867, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770725865", "total_tasks": 11, "accuracy_total": 0.0, "mean_rt": 3614.818181818182, "rt_variance": 237325.4214876033, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770725965", "total_tasks": 26, "accuracy_total": 0.0, "mean_rt": 3860.346153846154, "rt_variance": 393289.14940828405, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770726106", "total_tasks": 45, "accuracy_total": 0.0, "mean_rt": 4609.955555555555, "rt_variance": 1237523.464691358, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770726350", "total_tasks": 17, "accuracy_total": 0.0, "mean_rt": 3675.235294117647, "rt_variance": 237465.82698961938, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770727786", "total_tasks": 17, "accuracy_total": 0.058823529411764705, "mean_rt": 3653.823529411765, "rt_variance": 251668.85121107267, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770728310", "total_tasks": 20, "accuracy_total": 0.0, "mean_rt": 3650.2, "rt_variance": 243370.16, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}
+{"session_id": "s1770728883", "total_tasks": 20, "accuracy_total": 1.0, "mean_rt": 2932.45, "rt_variance": 880342.2475, "switch_cost": 0.0, "fatigue_trend": 0.0, "overload_events": 0}

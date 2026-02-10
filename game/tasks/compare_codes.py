@@ -52,5 +52,5 @@ class CompareCodesTask(TaskBase):
         screen.blit(code_a, (x, y + spacing))
         screen.blit(code_b, (x, y + spacing * 2))
 
-        hint = ctx.font_small.render("F/A = совпадает, J/O = не совпадает", True, ctx.color_main)
+        hint = ctx.font_small.render("F - да, J - нет", True, ctx.color_main)
         screen.blit(hint, (x, y + max_h - 22))

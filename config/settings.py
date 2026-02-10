@@ -61,7 +61,7 @@ class DifficultyConfig:
 class LevelConfig:
     min_level: int = 1
     max_level: int = 10
-    start_level: int = 4
+    start_level: int = 1
     check_every: int = 10
     window_size: int = 20
     up_accuracy: float = 0.85
