@@ -20,11 +20,11 @@ class GameUI:
         self.screen = screen
         self.w, self.h = screen.get_size()
         self.theme = UiTheme()
-        self.font_big = pygame.font.SysFont(None, 40)
-        self.font_huge = pygame.font.SysFont(None, 72)
-        self.font_mid = pygame.font.SysFont(None, 26)
-        self.font_small = pygame.font.SysFont(None, 21)
-        self.font_tiny = pygame.font.SysFont(None, 18)
+        self.font_big = self._make_font(40, bold=True)
+        self.font_huge = self._make_font(72, bold=True)
+        self.font_mid = self._make_font(28)
+        self.font_small = self._make_font(21)
+        self.font_tiny = self._make_font(17)
         self.stars = self._build_stars(80)
 
         margin = 20
@@ -104,12 +104,14 @@ class GameUI:
         tasks_done: int,
         total_tasks: int,
         level: int,
+        planets_visited: int,
     ) -> None:
         x = self.left_stats_panel.x + 16
         y = self.left_stats_panel.y + 14
         header = self.font_mid.render("Статистика", True, self.theme.accent)
         self.screen.blit(header, (x, y))
         lines = [
+            f"Планет: {planets_visited}",
             f"Уровень: {level}",
             f"Стабильность: {int(stability * 100)}%",
             f"Задачи: {tasks_done}/{total_tasks}",
@@ -160,12 +162,96 @@ class GameUI:
             self.screen.blit(surf, (x, yy))
             yy += 28
 
+    def draw_mission_panel(
+        self,
+        flight_progress: float,
+        zone_quality: float,
+        tasks_done: int,
+        total_tasks: int,
+        planets_visited: int,
+    ) -> None:
+        rect = self.center_panel
+        x = rect.x + 16
+        y = rect.y + 12
+        header = self.font_mid.render("Маршрут миссии", True, self.theme.accent)
+        self.screen.blit(header, (x, y))
+
+        sub = self.font_tiny.render("Удерживай точность и темп, чтобы долететь", True, self.theme.text)
+        self.screen.blit(sub, (x, y + 30))
+
+        track_top = y + 72
+        track_bottom = rect.bottom - 42
+        track_x = rect.x + rect.width // 2
+        pygame.draw.line(self.screen, self.theme.border, (track_x, track_top), (track_x, track_bottom), 4)
+
+        quality_color = (
+            int(80 + 120 * zone_quality),
+            int(110 + 100 * zone_quality),
+            int(120 + 90 * zone_quality),
+        )
+        glow_radius = 22 + int(10 * zone_quality)
+        pygame.draw.circle(self.screen, quality_color, (track_x, track_top), glow_radius, width=2)
+
+        progress = max(0.0, min(1.0, flight_progress))
+        rocket_y = int(track_bottom - (track_bottom - track_top) * progress)
+        rocket = [
+            (track_x, rocket_y - 20),
+            (track_x - 12, rocket_y + 14),
+            (track_x + 12, rocket_y + 14),
+        ]
+        pygame.draw.polygon(self.screen, self.theme.accent, rocket)
+        pygame.draw.rect(self.screen, (220, 90, 40), (track_x - 5, rocket_y + 14, 10, 10))
+
+        goal_label = self.font_tiny.render("ЦЕЛЬ", True, self.theme.text)
+        self.screen.blit(goal_label, (track_x + 24, track_top - 10))
+
+        progress_line = self.font_small.render(
+            f"Прогресс: {tasks_done}/{total_tasks}",
+            True,
+            self.theme.text,
+        )
+        self.screen.blit(progress_line, (x, rect.bottom - 28))
+        planets_line = self.font_tiny.render(
+            f"Посещено планет: {planets_visited}",
+            True,
+            self.theme.text,
+        )
+        self.screen.blit(planets_line, (x, rect.bottom - 48))
+
     def draw_task_panel(self, rect: pygame.Rect, title: str, active: bool) -> None:
         pygame.draw.rect(self.screen, self.theme.panel, rect, border_radius=10)
         pygame.draw.rect(self.screen, self.theme.border, rect, width=2, border_radius=10)
         color = self.theme.accent if active else self.theme.text
         label = self.font_small.render(title, True, color)
         self.screen.blit(label, (rect.x + 14, rect.y + 10))
+
+    def draw_button(self, rect: pygame.Rect, label: str, active: bool = False) -> None:
+        fill = (26, 34, 52) if not active else (22, 52, 66)
+        border = self.theme.accent if active else self.theme.border
+        pygame.draw.rect(self.screen, fill, rect, border_radius=10)
+        pygame.draw.rect(self.screen, border, rect, width=2, border_radius=10)
+        text = self.font_small.render(label, True, self.theme.text)
+        text_rect = text.get_rect(center=rect.center)
+        self.screen.blit(text, text_rect)
+
+    def _make_font(self, size: int, bold: bool = False) -> pygame.font.Font:
+        candidates = [
+            "sfprotext",
+            "sfprodisplay",
+            "helveticaneue",
+            "avenirnext",
+            "avenir",
+            "segoeui",
+            "arial",
+        ]
+        for name in candidates:
+            path = pygame.font.match_font(name)
+            if path:
+                font = pygame.font.Font(path, size)
+                if bold:
+                    font.set_bold(True)
+                return font
+        return pygame.font.SysFont(None, size, bold=bold)
 
     def _build_stars(self, count: int):
         rng = (self.w * 73856093) ^ (self.h * 19349663)

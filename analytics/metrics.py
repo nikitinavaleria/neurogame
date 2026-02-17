@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 
 def load_events(path: str) -> List[dict]:
@@ -81,12 +81,50 @@ def compute_switch_cost(events: List[dict]) -> float:
 def summarize_session(events: List[dict]) -> dict:
     accuracy = compute_accuracy(events)
     mean_rt, var_rt = compute_rt_stats(events)
+    batches: Dict[int, List[dict]] = defaultdict(list)
+    for e in events:
+        b = e.get("batch_index")
+        if b is None:
+            continue
+        try:
+            b = int(b)
+        except (TypeError, ValueError):
+            continue
+        batches[b].append(e)
+
+    if not batches and events:
+        # Совместимость со старыми логами: если batch_index отсутствует,
+        # разбиваем на псевдо-батчи по 10 задач.
+        for i, e in enumerate(events):
+            batches[(i // 10) + 1].append(e)
+
+    active_batches = 0
+    idle_batches = 0
+    levels = [int(e.get("level", 1)) for e in events if e.get("level") is not None]
+    answered_rate = 0.0
+    if events:
+        answered_rate = sum(1 for e in events if int(e.get("deadline_met", 0)) == 1) / len(events)
+    for _, batch_events in batches.items():
+        answered = sum(1 for e in batch_events if int(e.get("deadline_met", 0)) == 1)
+        if answered > 0:
+            active_batches += 1
+        else:
+            idle_batches += 1
+
+    level_gain = 0
+    if levels:
+        level_gain = levels[-1] - levels[0]
+
     return {
         "accuracy_total": accuracy,
         "mean_rt": mean_rt,
         "rt_variance": var_rt,
         "switch_cost": compute_switch_cost(events),
         "fatigue_trend": compute_fatigue_trend(events),
+        "answered_rate": answered_rate,
+        "active_batches": active_batches,
+        "idle_batches": idle_batches,
+        "level_gain": level_gain,
         "mode": events[0].get("mode", "unknown") if events else "unknown",
     }
 
@@ -107,6 +145,10 @@ def aggregate_by_mode(summaries: Dict[str, dict]) -> Dict[str, dict]:
             "rt_variance": sum(i["rt_variance"] for i in items) / len(items),
             "switch_cost": sum(i["switch_cost"] for i in items) / len(items),
             "fatigue_trend": sum(i["fatigue_trend"] for i in items) / len(items),
+            "answered_rate": sum(i["answered_rate"] for i in items) / len(items),
+            "active_batches": sum(i["active_batches"] for i in items) / len(items),
+            "idle_batches": sum(i["idle_batches"] for i in items) / len(items),
+            "level_gain": sum(i["level_gain"] for i in items) / len(items),
         }
     return results
 
@@ -124,7 +166,11 @@ def print_report(summaries: Dict[str, dict]) -> None:
             f"rt={s['mean_rt']:.1f} "
             f"var={s['rt_variance']:.1f} "
             f"switch={s['switch_cost']:.1f} "
-            f"fatigue={s['fatigue_trend']:.3f}"
+            f"fatigue={s['fatigue_trend']:.3f} "
+            f"answered={s['answered_rate']:.3f} "
+            f"active_batches={s['active_batches']} "
+            f"idle_batches={s['idle_batches']} "
+            f"level_gain={s['level_gain']}"
         )
 
     print("\nAggregate by mode:")
@@ -136,7 +182,11 @@ def print_report(summaries: Dict[str, dict]) -> None:
             f"rt={s['mean_rt']:.1f} "
             f"var={s['rt_variance']:.1f} "
             f"switch={s['switch_cost']:.1f} "
-            f"fatigue={s['fatigue_trend']:.3f}"
+            f"fatigue={s['fatigue_trend']:.3f} "
+            f"answered={s['answered_rate']:.3f} "
+            f"active_batches={s['active_batches']:.2f} "
+            f"idle_batches={s['idle_batches']:.2f} "
+            f"level_gain={s['level_gain']:.2f}"
         )
 
 

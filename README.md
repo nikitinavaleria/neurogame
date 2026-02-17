@@ -255,3 +255,32 @@
 - стоимость переключения (switch_cost)
 - устойчивость под нагрузкой (fatigue_trend)
 - удержание в оптимальной зоне сложности
+
+## Подготовка адаптации и обучения модели
+
+### 1) Сбор данных в игре
+- Запусти игру в baseline и/или adaptive режиме.
+- Логи пишутся в:
+  - `data/events.jsonl`
+  - `data/adaptations.jsonl`
+  - `data/sessions.jsonl`
+- В `data/adaptations.jsonl` каждая запись содержит `session_id`, `batch_index`, `state`, `action_id`, `reward`, `mode`.
+  - `action_space` = `tempo3` (действие кодирует только изменение темпа: `0=-1`, `1=0`, `2=+1`).
+  - адаптация применяется по завершению батча (этапа), синхронно с логикой уровней.
+
+### 2) Обучение модели
+```bash
+python -m training.train --data data/adaptations.jsonl --out data/ppo_agent.pt --epochs 40 --batch-size 64 --gamma 0.97 --mode all
+```
+Опции `--mode`:
+- `all` — использовать все записи
+- `baseline` — только baseline-сегменты
+- `ppo` — только adaptive/ppo-сегменты
+
+После обучения сохраняются:
+- веса: `data/ppo_agent.pt`
+- метаданные: `data/ppo_agent.meta.json`
+
+### 3) Использование модели в игре
+- Файл модели должен быть доступен по пути `data/ppo_agent.pt`.
+- На стартовом экране переключи режим на `адаптивный`.

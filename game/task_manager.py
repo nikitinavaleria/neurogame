@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from config.settings import DifficultyConfig
 from data.models import TaskResult, TaskSpec
-from game.tasks import CompareCodesTask, RuleSwitchTask, SequenceMemoryTask
+from game.tasks import CompareCodesTask, ParityCheckTask, RadarScanTask, RuleSwitchTask, SequenceMemoryTask
 from game.tasks.base import TaskBase
 
 
@@ -25,6 +25,7 @@ class TaskManager:
         self.tasks_created: int = 0
         self.tasks_completed: int = 0
         self.current_rule: str = "COLOR"
+        self.current_level: int = 1
 
     def update(self, now_ms: int) -> List[TaskResult]:
         results: List[TaskResult] = []
@@ -47,6 +48,7 @@ class TaskManager:
                 self.active_tasks.remove(focused)
                 self.tasks_completed += 1
                 self.next_spawn_after_ms = max(self.next_spawn_after_ms, now_ms + self.inter_task_pause_ms)
+                self._spawn_if_needed(now_ms)
                 return focused.get_result()
         return None
 
@@ -63,9 +65,15 @@ class TaskManager:
             return
         if len(self.active_tasks) >= self.difficulty.global_params.parallel_streams:
             return
-        interval_ms = int(self.difficulty.global_params.event_rate_sec * 1000)
         if now_ms < self.next_spawn_after_ms:
             return
+        if not self.active_tasks:
+            self.last_spawn_ms = now_ms
+            self.active_tasks.append(self._create_task(now_ms))
+            self.tasks_created += 1
+            return
+
+        interval_ms = int(self.difficulty.global_params.event_rate_sec * 1000)
         if now_ms - self.last_spawn_ms < interval_ms:
             return
         self.last_spawn_ms = now_ms
@@ -75,14 +83,27 @@ class TaskManager:
     def set_difficulty(self, difficulty: DifficultyConfig) -> None:
         self.difficulty = difficulty
 
+    def set_level(self, level: int) -> None:
+        self.current_level = level
+
     def _create_task(self, now_ms: int) -> TaskBase:
         mix = self.difficulty.global_params.task_mix
+        total = sum(mix) if mix else 1.0
         roll = self.rng.random()
-        if roll < mix[0]:
+        p_compare = mix[0] / total
+        p_memory = mix[1] / total if len(mix) > 1 else 0.0
+        p_switch = mix[2] / total if len(mix) > 2 else 0.0
+        p_parity = mix[3] / total if len(mix) > 3 else 0.0
+
+        if roll < p_compare:
             return self._create_compare_codes(now_ms)
-        if roll < mix[0] + mix[1]:
+        if roll < p_compare + p_memory:
             return self._create_sequence_memory(now_ms)
-        return self._create_rule_switch(now_ms)
+        if roll < p_compare + p_memory + p_switch:
+            return self._create_rule_switch(now_ms)
+        if roll < p_compare + p_memory + p_switch + p_parity:
+            return self._create_parity_check(now_ms)
+        return self._create_radar_scan(now_ms)
 
     def _create_compare_codes(self, now_ms: int) -> TaskBase:
         diff = self.difficulty.compare
@@ -128,8 +149,46 @@ class TaskManager:
             difficulty={
                 "rule_switch_rate": diff.rule_switch_rate,
                 "stimulus_rate_sec": diff.stimulus_rate_sec,
+                "rule_complexity": diff.rule_complexity,
                 "time_limit_ms": diff.time_limit_ms,
+                "level": self.current_level,
             },
             payload={"rule": self.current_rule},
         )
         return RuleSwitchTask(spec, self.rng)
+
+    def _create_parity_check(self, now_ms: int) -> TaskBase:
+        diff = self.difficulty.parity
+        deadline = now_ms + int(diff.time_limit_ms * self.difficulty.global_params.time_pressure)
+        spec = TaskSpec(
+            task_id="parity_check",
+            created_ms=now_ms,
+            deadline_ms=deadline,
+            difficulty={
+                "min_value": diff.min_value,
+                "max_value": diff.max_value,
+                "question_complexity": diff.question_complexity,
+                "time_limit_ms": diff.time_limit_ms,
+                "level": self.current_level,
+            },
+            payload={},
+        )
+        return ParityCheckTask(spec, self.rng)
+
+    def _create_radar_scan(self, now_ms: int) -> TaskBase:
+        diff = self.difficulty.radar
+        deadline = now_ms + int(diff.time_limit_ms * self.difficulty.global_params.time_pressure)
+        spec = TaskSpec(
+            task_id="radar_scan",
+            created_ms=now_ms,
+            deadline_ms=deadline,
+            difficulty={
+                "signal_len": diff.signal_len,
+                "threat_rate": diff.threat_rate,
+                "target_pool_size": diff.target_pool_size,
+                "time_limit_ms": diff.time_limit_ms,
+                "level": self.current_level,
+            },
+            payload={},
+        )
+        return RadarScanTask(spec, self.rng)
