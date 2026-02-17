@@ -3,7 +3,7 @@ AppName=NeuroGame
 AppVersion=1.0.0
 DefaultDirName={autopf}\NeuroGame
 DefaultGroupName=NeuroGame
-OutputDir=dist
+OutputDir=..\..\dist
 OutputBaseFilename=NeuroGameSetup
 Compression=lzma
 SolidCompression=yes
@@ -14,7 +14,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "dist\NeuroGame.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\NeuroGame.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\NeuroGame"; Filename: "{app}\NeuroGame.exe"
@@ -22,4 +22,3 @@ Name: "{autodesktop}\NeuroGame"; Filename: "{app}\NeuroGame.exe"
 
 [Run]
 Filename: "{app}\NeuroGame.exe"; Description: "Launch NeuroGame"; Flags: nowait postinstall skipifsilent
-
