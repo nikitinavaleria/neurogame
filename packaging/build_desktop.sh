@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SPEC_PATH="$ROOT_DIR/packaging/neurogame.spec"
 DIST_DIR="$ROOT_DIR/dist"
 BUILD_DIR="$ROOT_DIR/build"
 
@@ -12,7 +11,14 @@ echo "[1/4] Installing packaging dependency (PyInstaller)..."
 python -m pip install --upgrade pyinstaller
 
 echo "[2/4] Building desktop executable..."
-python -m PyInstaller --noconfirm --clean "$SPEC_PATH"
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
+  ADD_DATA_SEP=";"
+else
+  ADD_DATA_SEP=":"
+fi
+python -m PyInstaller --noconfirm --clean --onefile --windowed --name NeuroGame \
+  --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
+  "$ROOT_DIR/main.py"
 
 echo "[3/4] Preparing release archive..."
 mkdir -p "$DIST_DIR"
@@ -42,4 +48,3 @@ echo "Archive: $ARCHIVE_PATH"
 echo
 echo "To run built app:"
 echo "  $DIST_DIR/NeuroGame"
-

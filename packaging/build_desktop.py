@@ -37,8 +37,9 @@ def main() -> None:
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    spec = root / "packaging" / "neurogame.spec"
     dist = root / "dist"
+    main_py = root / "main.py"
+    data_dir = root / "data"
 
     print("[1/4] Checking PyInstaller...")
     pyinstaller_installed = importlib.util.find_spec("PyInstaller") is not None
@@ -78,7 +79,23 @@ def main() -> None:
         sys.exit(2)
 
     print("[2/4] Building desktop executable...")
-    run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", str(spec)], cwd=root)
+    add_data_sep = ";" if sys.platform.startswith("win") else ":"
+    add_data_arg = f"{data_dir}{add_data_sep}data"
+    build_cmd = [
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--onefile",
+        "--windowed",
+        "--name",
+        "NeuroGame",
+        "--add-data",
+        add_data_arg,
+        str(main_py),
+    ]
+    run(build_cmd, cwd=root)
 
     print("[3/4] Preparing release archive...")
     platform_tag = f"{platform.system().lower()}-{platform.machine().lower()}"
