@@ -2,6 +2,7 @@ import statistics
 import time
 import random
 import json
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -14,6 +15,7 @@ from config.settings import DifficultyConfig, LevelConfig, SessionConfig, Window
 from data.auth import UserAuthStore
 from data.logger import JsonlLogger
 from data.models import SessionSummary, TaskResult
+from data.telemetry_client import TelemetryClient
 from game.task_manager import TaskManager
 from game.tasks.base import TaskRenderContext
 from game.ui import GameUI
@@ -59,6 +61,11 @@ class GameApp:
         self.task_manager.set_level(self.current_level)
         self.events_logger = JsonlLogger("data/events.jsonl")
         self.session_logger = JsonlLogger("data/sessions.jsonl")
+        self.telemetry = TelemetryClient(
+            endpoint_url=os.getenv("NEUROGAME_TELEMETRY_URL", "http://127.0.0.1:8000/v1/events").strip(),
+            api_key=os.getenv("NEUROGAME_TELEMETRY_API_KEY", "dev-key-change-me").strip(),
+            client_version=os.getenv("NEUROGAME_CLIENT_VERSION", "game-dev"),
+        )
         self.session_id = f"s{int(time.time())}"
         self.results: List[TaskResult] = []
         self.stability = 0.0
@@ -121,6 +128,7 @@ class GameApp:
         self.pause_menu_open: bool = False
         self.pending_runs_path = Path("data/pending_runs.json")
         self.persist_active_run_on_exit: bool = False
+        self.partial_session_end_emitted: bool = False
 
     def run(self) -> None:
         while self.running:
@@ -130,6 +138,7 @@ class GameApp:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     if self._has_resumable_run():
+                        self._emit_partial_session_end(reason="window_close")
                         self._save_active_run_snapshot()
                         self.persist_active_run_on_exit = True
                     self.running = False
@@ -139,6 +148,18 @@ class GameApp:
                     elif self.pause_menu_open:
                         self.started = True
                         self.pause_menu_open = False
+                        self.telemetry.track(
+                            event_type="session_resume",
+                            user_id=self.user_id,
+                            session_id=self.session_id,
+                            model_version=f"{self.selected_mode}_v1",
+                            payload={
+                                "session_id": self.session_id,
+                                "user_id": self.user_id,
+                                "mode": self.selected_mode,
+                                "source": "escape",
+                            },
+                        )
                     continue
                 if self.started:
                     result = self.task_manager.handle_event(event, now_ms)
@@ -188,12 +209,14 @@ class GameApp:
                 for result in results:
                     self._handle_result(result)
 
+            self.telemetry.flush()
             self._render(now_ms)
 
             if self.started and self.task_manager.is_done():
                 self._start_next_batch()
 
         self._finalize_session()
+        self.telemetry.flush(force=True)
         pygame.quit()
 
     def _handle_result(self, result: TaskResult) -> None:
@@ -208,27 +231,33 @@ class GameApp:
         else:
             self.last_feedback_text = "Ответ принят" if result.correct else "Ошибка"
             self.last_feedback_ok = result.correct
-        self.events_logger.write(
-            {
-                "timestamp": int(time.time()),
-                "session_id": self.session_id,
-                "user_id": self.user_id,
-                "batch_index": self.batch_index,
-                "batch_task_index": self.task_manager.tasks_completed,
-                "task_id": result.task_id,
-                "difficulty": result.difficulty,
-                "global_difficulty": self._serialize_global_difficulty(),
-                "level": self.current_level,
-                "adapt_state": self.last_adapt_state,
-                "adapt_action": self.last_adapt_action,
-                "adapt_reward": self.last_adapt_reward,
-                "mode": self.selected_mode,
-                "payload": result.payload,
-                "response": result.response,
-                "correct": int(result.correct),
-                "reaction_time": result.rt_ms,
-                "deadline_met": int(not result.is_timeout),
-            }
+        event_record = {
+            "timestamp": int(time.time()),
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "batch_index": self.batch_index,
+            "batch_task_index": self.task_manager.tasks_completed,
+            "task_id": result.task_id,
+            "difficulty": result.difficulty,
+            "global_difficulty": self._serialize_global_difficulty(),
+            "level": self.current_level,
+            "adapt_state": self.last_adapt_state,
+            "adapt_action": self.last_adapt_action,
+            "adapt_reward": self.last_adapt_reward,
+            "mode": self.selected_mode,
+            "payload": result.payload,
+            "response": result.response,
+            "correct": int(result.correct),
+            "reaction_time": result.rt_ms,
+            "deadline_met": int(not result.is_timeout),
+        }
+        self.events_logger.write(event_record)
+        self.telemetry.track(
+            event_type="task_result",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload=event_record,
         )
         if result.correct:
             self.stability = min(1.0, self.stability + 0.01)
@@ -280,23 +309,29 @@ class GameApp:
         self.last_adapt_action = action_id
         self.last_adapt_reward = reward
 
-        self.adapt_logger.write(
-            {
-                "step": self.adapt_step,
-                "user_id": self.user_id,
-                "session_id": self.session_id,
-                "batch_index": self.batch_index,
-                "batch_tasks_completed": self.task_manager.tasks_completed,
-                "state": state,
-                "action_id": action_id,
-                "delta_level": delta_level,
-                "delta_tempo": delta_tempo,
-                "reward": reward,
-                "level": self.current_level,
-                "tempo_offset": self.tempo_offset,
-                "mode": effective_mode,
-                "action_space": "tempo3",
-            }
+        adaptation_record = {
+            "step": self.adapt_step,
+            "user_id": self.user_id,
+            "session_id": self.session_id,
+            "batch_index": self.batch_index,
+            "batch_tasks_completed": self.task_manager.tasks_completed,
+            "state": state,
+            "action_id": action_id,
+            "delta_level": delta_level,
+            "delta_tempo": delta_tempo,
+            "reward": reward,
+            "level": self.current_level,
+            "tempo_offset": self.tempo_offset,
+            "mode": effective_mode,
+            "action_space": "tempo3",
+        }
+        self.adapt_logger.write(adaptation_record)
+        self.telemetry.track(
+            event_type="adaptation_step",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{effective_mode}_v1",
+            payload=adaptation_record,
         )
         self.adapt_step += 1
 
@@ -539,10 +574,10 @@ class GameApp:
                     self.start_button_rect = pygame.Rect(center_box.x + 20, controls_y, 220, 36)
                     self.ui.draw_button(self.start_button_rect, "Старт", active=True)
         else:
-            self.start_button_rect = pygame.Rect(center_box.x + 20, controls_y, 220, 36)
-            self.ui.draw_button(self.start_button_rect, "Старт", active=True)
-            self.menu_button_rect = pygame.Rect(center_box.x + 252, controls_y, 210, 36)
-            self.ui.draw_button(self.menu_button_rect, "В паузу", active=False)
+            self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, 280, 36)
+            self.ui.draw_button(self.resume_button_rect, "Продолжить текущий", active=True)
+            self.restart_button_rect = pygame.Rect(center_box.x + 312, controls_y, 190, 36)
+            self.ui.draw_button(self.restart_button_rect, "Начать с 1", active=False)
         self.logout_button_rect = pygame.Rect(center_box.right - 430, controls_y, 200, 36)
         self.ui.draw_button(self.logout_button_rect, "Сменить пользователя", active=False)
         self.exit_button_rect = pygame.Rect(center_box.right - 218, controls_y, 198, 36)
@@ -810,6 +845,9 @@ class GameApp:
 
     def _handle_menu_mouse(self, pos: tuple[int, int]) -> None:
         if self.resume_button_rect and self.resume_button_rect.collidepoint(pos):
+            if not self.awaiting_run_setup:
+                self.started = True
+                return
             if self.awaiting_run_setup and self._restore_saved_run():
                 return
             level = int(self.user_progress.get("last_level", 1))
@@ -848,6 +886,18 @@ class GameApp:
         if self.resume_button_rect and self.resume_button_rect.collidepoint(pos):
             self.pause_menu_open = False
             self.started = True
+            self.telemetry.track(
+                event_type="session_resume",
+                user_id=self.user_id,
+                session_id=self.session_id,
+                model_version=f"{self.selected_mode}_v1",
+                payload={
+                    "session_id": self.session_id,
+                    "user_id": self.user_id,
+                    "mode": self.selected_mode,
+                    "source": "pause_menu_button",
+                },
+            )
             return
         if self.menu_button_rect and self.menu_button_rect.collidepoint(pos):
             self.pause_menu_open = False
@@ -894,13 +944,67 @@ class GameApp:
             return
         self.started = False
         self.pause_menu_open = open_pause_menu
+        self.telemetry.track(
+            event_type="session_pause",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload={
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "mode": self.selected_mode,
+                "reason": "pause_menu" if open_pause_menu else "menu",
+            },
+        )
         self._save_active_run_snapshot()
 
     def _exit_app(self) -> None:
         if self._has_resumable_run():
+            self._emit_partial_session_end(reason="menu_exit")
             self._save_active_run_snapshot()
             self.persist_active_run_on_exit = True
         self.running = False
+
+    def _emit_partial_session_end(self, reason: str) -> None:
+        if self.partial_session_end_emitted:
+            return
+        if not self.user_id or not self.session_id:
+            return
+        tasks = len(self.results)
+        if tasks > 0:
+            accuracy = sum(1 for r in self.results if r.correct) / tasks
+            rts = [r.rt_ms for r in self.results if r.rt_ms is not None]
+            mean_rt = statistics.mean(rts) if rts else 0.0
+            rt_variance = statistics.pvariance(rts) if len(rts) > 1 else 0.0
+        else:
+            accuracy = 0.0
+            mean_rt = 0.0
+            rt_variance = 0.0
+        payload = {
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "total_tasks": tasks,
+            "accuracy_total": accuracy,
+            "mean_rt": mean_rt,
+            "rt_variance": rt_variance,
+            "switch_cost": 0.0,
+            "fatigue_trend": 0.0,
+            "overload_events": 0,
+            "max_level": self.current_level,
+            "last_level": self.current_level,
+            "planets_visited": self.planets_visited,
+            "mode": self.selected_mode,
+            "is_partial": 1,
+            "exit_reason": reason,
+        }
+        self.telemetry.track(
+            event_type="session_end_partial",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload=payload,
+        )
+        self.partial_session_end_emitted = True
 
     def _has_resumable_run(self) -> bool:
         return self.authenticated and (self.started or not self.awaiting_run_setup)
@@ -1025,12 +1129,27 @@ class GameApp:
         self.started = False
         self.pause_menu_open = False
         self.awaiting_run_setup = False
+        self.partial_session_end_emitted = False
         self.last_feedback_text = "Сессия восстановлена. Нажми Старт."
         self.last_feedback_ok = True
         self.last_feedback_ms = pygame.time.get_ticks()
         self.last_feedback_duration_ms = 2200
         self.active_slot_index = None
         self.last_focused_token = None
+        self.telemetry.track(
+            event_type="session_resume",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload={
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "mode": self.selected_mode,
+                "level": self.current_level,
+                "tempo_offset": self.tempo_offset,
+                "batch_index": self.batch_index,
+            },
+        )
         self._roll_motivation_phrase()
         return True
 
@@ -1062,11 +1181,26 @@ class GameApp:
         self.awaiting_run_setup = False
         self.pause_menu_open = False
         self.started = True
+        self.partial_session_end_emitted = False
         self._clear_saved_run()
+        self.telemetry.track(
+            event_type="session_start",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload={
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "mode": self.selected_mode,
+                "level": self.current_level,
+                "tempo_offset": self.tempo_offset,
+            },
+        )
         self._roll_motivation_phrase()
 
     def _logout_user(self) -> None:
         if self._has_resumable_run():
+            self._emit_partial_session_end(reason="logout")
             self._save_active_run_snapshot()
         self.authenticated = False
         self.started = False
@@ -1092,9 +1226,12 @@ class GameApp:
         }
 
     def _load_user_progress(self, user_id: str) -> Dict[str, float]:
+        lifetime_planets = self.auth_store.get_user_stat(user_id, "total_planets", 0.0)
         path = Path("data/sessions.jsonl")
         if not path.exists():
-            return self._empty_progress()
+            base = self._empty_progress()
+            base["total_planets"] = lifetime_planets
+            return base
 
         sessions = []
         with path.open("r", encoding="utf-8") as f:
@@ -1110,14 +1247,17 @@ class GameApp:
                     sessions.append(rec)
 
         if not sessions:
-            return self._empty_progress()
+            base = self._empty_progress()
+            base["total_planets"] = lifetime_planets
+            return base
 
         avg_acc = sum(float(s.get("accuracy_total", 0.0)) for s in sessions) / len(sessions)
         best_acc = max(float(s.get("accuracy_total", 0.0)) for s in sessions)
         avg_rt = sum(float(s.get("mean_rt", 0.0)) for s in sessions) / len(sessions)
         last_acc = float(sessions[-1].get("accuracy_total", 0.0))
         last_level = float(sessions[-1].get("last_level", sessions[-1].get("max_level", 1)))
-        total_planets = sum(float(s.get("planets_visited", 0.0)) for s in sessions)
+        sessions_planets = sum(float(s.get("planets_visited", 0.0)) for s in sessions)
+        total_planets = max(lifetime_planets, sessions_planets)
         return {
             "sessions": float(len(sessions)),
             "avg_accuracy": avg_acc,
@@ -1184,8 +1324,13 @@ class GameApp:
         return {"tasks": float(tasks), "accuracy": accuracy, "mean_rt": mean_rt}
 
     def _total_planets_overall(self) -> int:
-        saved = int(self.user_progress.get("total_planets", 0.0))
-        return saved + int(self.planets_visited)
+        return int(self.user_progress.get("total_planets", 0.0))
+
+    def _increment_total_planets(self, delta: int = 1) -> None:
+        if not self.user_id or delta <= 0:
+            return
+        new_total = self.auth_store.increment_user_stat(self.user_id, "total_planets", float(delta))
+        self.user_progress["total_planets"] = new_total
 
     def _rl_warning(self) -> str:
         if Path(self.session.rl_model_path).exists():
@@ -1229,6 +1374,15 @@ class GameApp:
         record["last_level"] = self.current_level
         record["planets_visited"] = self.planets_visited
         self.session_logger.write(record)
+        self.telemetry.track(
+            event_type="session_end",
+            user_id=self.user_id,
+            session_id=self.session_id,
+            model_version=f"{self.selected_mode}_v1",
+            payload=record,
+        )
+        self.telemetry.flush(force=True)
+        self.partial_session_end_emitted = True
         self._clear_saved_run()
         if self.user_id:
             self.user_progress = self._load_user_progress(self.user_id)
@@ -1390,6 +1544,7 @@ class GameApp:
 
         self._maybe_adapt(batch)
         self.planets_visited += 1
+        self._increment_total_planets(1)
         answer_rate = answered / max(1, self.session.total_tasks)
         answer_accuracy = (correct / answered) if answered > 0 else 0.0
 

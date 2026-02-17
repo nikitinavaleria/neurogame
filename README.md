@@ -284,3 +284,32 @@ python -m training.train --data data/adaptations.jsonl --out data/ppo_agent.pt -
 ### 3) Использование модели в игре
 - Файл модели должен быть доступен по пути `data/ppo_agent.pt`.
 - На стартовом экране переключи режим на `адаптивный`.
+
+## Сборка Desktop-версии (PyInstaller)
+
+Можно собрать исполняемый файл и архив для раздачи.
+
+### Вариант 1: кнопкой Run в PyCharm
+- Запусти файл: `packaging/build_desktop.py`
+
+### Вариант 2: из терминала
+```bash
+python packaging/build_desktop.py --install-deps
+```
+
+После сборки:
+- исполняемый файл: `dist/NeuroGame` (или `dist/NeuroGame.exe`)
+- архив для распространения: `dist/neurogame-<platform>.zip`
+
+## Сборка в GitHub (Mac + Windows)
+
+В проект добавлен workflow: `.github/workflows/build-release.yml`.
+
+Как запускать:
+1. Запушь изменения в GitHub.
+2. Открой вкладку `Actions`.
+3. Выбери workflow `Build Installers`.
+4. Нажми `Run workflow`.
+5. После завершения скачай артефакты:
+- `neurogame-macos` (внутри `NeuroGame.dmg`)
+- `neurogame-windows` (внутри `NeuroGameSetup.exe`)
