@@ -1,0 +1,10 @@
+{
+  "users": {
+    "lera": {
+      "username": "lera",
+      "salt_b64": "pCnfX6lbzuoVg2Rg9sVcVg==",
+      "pwd_hash_b64": "MFomAV76lZtF1IP1MMH2Z9MUjwusLSNS14B55hVkQaM=",
+      "created_at": 1771006986
+    }
+  }
+}

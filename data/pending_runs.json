@@ -1,0 +1,2015 @@
+{
+  "runs": {
+    "lera": {
+      "session_id": "s1771348297_lera",
+      "current_level": 10,
+      "tempo_offset": -1,
+      "selected_mode": "baseline",
+      "stability": 0.13000000000000006,
+      "batch_result_start": 110,
+      "batch_index": 12,
+      "planets_visited": 11,
+      "pause_between_levels": false,
+      "awaiting_run_setup": false,
+      "last_feedback_text": "Ошибка",
+      "last_feedback_ok": false,
+      "adapt_step": 11,
+      "last_adapt_state": [
+        0.75,
+        427.375,
+        297.0096536730751,
+        0.0,
+        0.0,
+        -116.98809523809524,
+        10.0,
+        3.5424,
+        1.512,
+        1.0,
+        0.24,
+        0.2
+      ],
+      "last_adapt_action": 1,
+      "last_adapt_reward": 0.050000000000000044,
+      "results": [
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 25415,
+          "finished_ms": 29087,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 3672,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 7,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3486
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 29087,
+          "finished_ms": 30633,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1546,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.47,
+            "time_limit_ms": 2656
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 30633,
+          "finished_ms": 32330,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1697,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 8,
+            "threat_rate": 0.35,
+            "target_pool_size": 4,
+            "time_limit_ms": 2656,
+            "level": 7
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 32330,
+          "finished_ms": 33737,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1407,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.43,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 5,
+            "time_limit_ms": 2656,
+            "level": 7
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "пятиугольник",
+            "question_text": "Форма: это пятиугольник?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 33737,
+          "finished_ms": 34635,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 898,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.43,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 5,
+            "time_limit_ms": 2656,
+            "level": 7
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "синий",
+            "question_text": "Цвет: это синий?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 34635,
+          "finished_ms": 35720,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1085,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.43,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 5,
+            "time_limit_ms": 2656,
+            "level": 7
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "оранжевый",
+            "question_text": "Цвет: это оранжевый?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 35720,
+          "finished_ms": 36691,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 971,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -10,
+            "max_value": 339,
+            "question_complexity": 4,
+            "time_limit_ms": 2490,
+            "level": 7
+          },
+          "payload": {
+            "question_type": "even",
+            "question_text": "Число четное?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 36691,
+          "finished_ms": 39883,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 3192,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 7,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3486
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 39883,
+          "finished_ms": 40833,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 950,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -10,
+            "max_value": 339,
+            "question_complexity": 4,
+            "time_limit_ms": 2490,
+            "level": 7
+          },
+          "payload": {
+            "question_type": "even",
+            "question_text": "Число четное?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 40833,
+          "finished_ms": 43062,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2229,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 8,
+            "threat_rate": 0.35,
+            "target_pool_size": 4,
+            "time_limit_ms": 2656,
+            "level": 7
+          },
+          "payload": {
+            "target_symbol": "N"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 52323,
+          "finished_ms": 54889,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 2566,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.49,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 54889,
+          "finished_ms": 56079,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1190,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.49,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 56079,
+          "finished_ms": 57473,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1394,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -20,
+            "max_value": 379,
+            "question_complexity": 5,
+            "time_limit_ms": 2263,
+            "level": 8
+          },
+          "payload": {
+            "question_type": "prime",
+            "question_text": "Число простое?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 57473,
+          "finished_ms": 59261,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1788,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.49,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 59261,
+          "finished_ms": 61047,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1786,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.49,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 61047,
+          "finished_ms": 62001,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 954,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.45999999999999996,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2414,
+            "level": 8
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "синий",
+            "question_text": "Цвет: это синий?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 62001,
+          "finished_ms": 63871,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1870,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -20,
+            "max_value": 379,
+            "question_complexity": 5,
+            "time_limit_ms": 2263,
+            "level": 8
+          },
+          "payload": {
+            "question_type": "contains_digit",
+            "question_text": "Содержит цифру 1?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 63871,
+          "finished_ms": 65130,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1259,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.45999999999999996,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2414,
+            "level": 8
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "синий",
+            "question_text": "Цвет: это синий?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 65130,
+          "finished_ms": 66236,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 1106,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 8
+          },
+          "payload": {
+            "target_symbol": "N"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 66236,
+          "finished_ms": 68329,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 2093,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.49,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 68345,
+          "finished_ms": 69216,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 871,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 69216,
+          "finished_ms": 70408,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1192,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 70408,
+          "finished_ms": 71991,
+          "response": "mismatch",
+          "correct": false,
+          "rt_ms": 1583,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 71991,
+          "finished_ms": 75105,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 3114,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 75105,
+          "finished_ms": 77709,
+          "response": null,
+          "correct": false,
+          "rt_ms": 2604,
+          "is_timeout": true,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "N"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 77709,
+          "finished_ms": 78918,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1209,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -30,
+            "max_value": 419,
+            "question_complexity": 5,
+            "time_limit_ms": 2066,
+            "level": 9
+          },
+          "payload": {
+            "question_type": "even",
+            "question_text": "Число четное?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 78918,
+          "finished_ms": 81813,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2895,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 81813,
+          "finished_ms": 82700,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 887,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.49,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "красный",
+            "question_text": "Цвет: это красный?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 82700,
+          "finished_ms": 84198,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1498,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 84198,
+          "finished_ms": 85182,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 984,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.49,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "красный",
+            "question_text": "Цвет: это красный?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 85199,
+          "finished_ms": 88062,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2863,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 88062,
+          "finished_ms": 91294,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 3232,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 91294,
+          "finished_ms": 93115,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1821,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 93115,
+          "finished_ms": 95550,
+          "response": null,
+          "correct": false,
+          "rt_ms": 2435,
+          "is_timeout": true,
+          "difficulty": {
+            "min_value": -30,
+            "max_value": 419,
+            "question_complexity": 5,
+            "time_limit_ms": 2066,
+            "level": 9
+          },
+          "payload": {
+            "question_type": "greater_than",
+            "question_text": "Число больше -3?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 95550,
+          "finished_ms": 95704,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 154,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.49,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "красный",
+            "question_text": "Цвет: это красный?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 95704,
+          "finished_ms": 98888,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 3184,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 98888,
+          "finished_ms": 101489,
+          "response": null,
+          "correct": false,
+          "rt_ms": 2601,
+          "is_timeout": true,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 101489,
+          "finished_ms": 104159,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 2670,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 104159,
+          "finished_ms": 105282,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1123,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 105282,
+          "finished_ms": 106250,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 968,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2204,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "R"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 106267,
+          "finished_ms": 108976,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2709,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3168
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 108976,
+          "finished_ms": 110525,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 1549,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "N"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 110525,
+          "finished_ms": 112040,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1515,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "R"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 112040,
+          "finished_ms": 113607,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1567,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -30,
+            "max_value": 419,
+            "question_complexity": 5,
+            "time_limit_ms": 2263,
+            "level": 9
+          },
+          "payload": {
+            "question_type": "even",
+            "question_text": "Число четное?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 113607,
+          "finished_ms": 114886,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1279,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "X"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 114886,
+          "finished_ms": 116419,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1533,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "X"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 116419,
+          "finished_ms": 118019,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1600,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.49,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "ромб",
+            "question_text": "Форма: это ромб?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 118019,
+          "finished_ms": 119468,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1449,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.51,
+            "time_limit_ms": 2414
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 119468,
+          "finished_ms": 120914,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1446,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.49,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 6,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "ромб",
+            "question_text": "Форма: это ромб?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 120914,
+          "finished_ms": 123159,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2245,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 5,
+            "time_limit_ms": 2414,
+            "level": 9
+          },
+          "payload": {
+            "target_symbol": "X"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 123176,
+          "finished_ms": 125695,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2519,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "зелёный",
+            "question_text": "Цвет: это зелёный?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 125695,
+          "finished_ms": 128319,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2624,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 128319,
+          "finished_ms": 131007,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2688,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 131007,
+          "finished_ms": 133766,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 2759,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 133766,
+          "finished_ms": 135194,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1428,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 135194,
+          "finished_ms": 136337,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1143,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "N"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 136337,
+          "finished_ms": 137466,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1129,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "ромб",
+            "question_text": "Форма: это ромб?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 137466,
+          "finished_ms": 138571,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1105,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 138571,
+          "finished_ms": 141926,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 3355,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 141926,
+          "finished_ms": 143253,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1327,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2066,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "greater_than",
+            "question_text": "Число больше 23?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 143269,
+          "finished_ms": 146212,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 2943,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 146212,
+          "finished_ms": 148814,
+          "response": null,
+          "correct": false,
+          "rt_ms": 2602,
+          "is_timeout": true,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "бирюзовый",
+            "question_text": "Цвет: это бирюзовый?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 148814,
+          "finished_ms": 201969,
+          "response": null,
+          "correct": false,
+          "rt_ms": 53155,
+          "is_timeout": true,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "круг",
+            "question_text": "Форма: это круг?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 25786,
+          "finished_ms": 28144,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 2358,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2204,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 28144,
+          "finished_ms": 30909,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 2765,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 30909,
+          "finished_ms": 33474,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 2565,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 2892
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 33474,
+          "finished_ms": 34852,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1378,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 34852,
+          "finished_ms": 36312,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 1460,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2066,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "divisible",
+            "question_text": "Число кратно 3?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 36312,
+          "finished_ms": 37585,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1273,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 37585,
+          "finished_ms": 38703,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1118,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2204
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 38719,
+          "finished_ms": 39923,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1204,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "ромб",
+            "question_text": "Форма: это ромб?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 39923,
+          "finished_ms": 40756,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 833,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "фиолетовый",
+            "question_text": "Цвет: это фиолетовый?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 40756,
+          "finished_ms": 42320,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 1564,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "digit_sum_even",
+            "question_text": "Сумма цифр четная?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 42320,
+          "finished_ms": 45466,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 3146,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3719
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 45466,
+          "finished_ms": 46642,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 1176,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 46642,
+          "finished_ms": 47969,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1327,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "divisible",
+            "question_text": "Число кратно 5?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 47969,
+          "finished_ms": 49553,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1584,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "greater_than",
+            "question_text": "Число больше 259?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 49553,
+          "finished_ms": 50489,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 936,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 50489,
+          "finished_ms": 51700,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 1211,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "круг",
+            "question_text": "Форма: это круг?"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 51700,
+          "finished_ms": 54522,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2822,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3719
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 54538,
+          "finished_ms": 55491,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 953,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 55491,
+          "finished_ms": 58264,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 2773,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3719
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 58264,
+          "finished_ms": 60801,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 2537,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3719
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 60801,
+          "finished_ms": 63166,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 2365,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "X"
+          }
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 63166,
+          "finished_ms": 66351,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 3185,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3719
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 66351,
+          "finished_ms": 68001,
+          "response": "yes",
+          "correct": false,
+          "rt_ms": 1650,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "digit_sum_even",
+            "question_text": "Сумма цифр четная?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 68001,
+          "finished_ms": 70845,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 2844,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "contains_digit",
+            "question_text": "Содержит цифру 3?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 70845,
+          "finished_ms": 72170,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1325,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "жёлтый",
+            "question_text": "Цвет: это жёлтый?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 72170,
+          "finished_ms": 73274,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1104,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 73274,
+          "finished_ms": 74499,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 1225,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 74515,
+          "finished_ms": 75808,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1293,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 3043,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "ромб",
+            "question_text": "Форма: это ромб?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 75808,
+          "finished_ms": 76778,
+          "response": "match",
+          "correct": true,
+          "rt_ms": 970,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 3043
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 76778,
+          "finished_ms": 77883,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1105,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 3043
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 77883,
+          "finished_ms": 79037,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1154,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 3043,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "жёлтый",
+            "question_text": "Цвет: это жёлтый?"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 79037,
+          "finished_ms": 80552,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1515,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 3043,
+            "level": 10
+          },
+          "payload": {
+            "rule": "SHAPE",
+            "target_shape": "пятиугольник",
+            "question_text": "Форма: это пятиугольник?"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 80552,
+          "finished_ms": 81794,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1242,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2853,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "prime",
+            "question_text": "Число простое?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 81794,
+          "finished_ms": 84601,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 2807,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 3043
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "sequence_memory",
+          "created_ms": 84601,
+          "finished_ms": 87650,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 3049,
+          "is_timeout": false,
+          "difficulty": {
+            "seq_len": 8,
+            "retention_delay_ms": 0,
+            "time_limit_ms": 3995
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 87650,
+          "finished_ms": 88517,
+          "response": "yes",
+          "correct": true,
+          "rt_ms": 867,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2853,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "prime",
+            "question_text": "Число простое?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 88517,
+          "finished_ms": 90354,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 1837,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 3043
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 90370,
+          "finished_ms": 92240,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1870,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "K"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 92240,
+          "finished_ms": 93805,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1565,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "prime",
+            "question_text": "Число простое?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 93805,
+          "finished_ms": 94895,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 1090,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "M"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 94895,
+          "finished_ms": 95507,
+          "response": "match",
+          "correct": false,
+          "rt_ms": 612,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 95507,
+          "finished_ms": 96001,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 494,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "R"
+          }
+        },
+        {
+          "task_id": "parity_check",
+          "created_ms": 96001,
+          "finished_ms": 96460,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 459,
+          "is_timeout": false,
+          "difficulty": {
+            "min_value": -40,
+            "max_value": 459,
+            "question_complexity": 6,
+            "time_limit_ms": 2656,
+            "level": 10
+          },
+          "payload": {
+            "question_type": "prime",
+            "question_text": "Число простое?"
+          }
+        },
+        {
+          "task_id": "radar_scan",
+          "created_ms": 96460,
+          "finished_ms": 96698,
+          "response": "no",
+          "correct": false,
+          "rt_ms": 238,
+          "is_timeout": false,
+          "difficulty": {
+            "signal_len": 9,
+            "threat_rate": 0.35,
+            "target_pool_size": 6,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "target_symbol": "Z"
+          }
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 96698,
+          "finished_ms": 96884,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 186,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "фиолетовый",
+            "question_text": "Цвет: это фиолетовый?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 96884,
+          "finished_ms": 97070,
+          "response": "mismatch",
+          "correct": true,
+          "rt_ms": 186,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        },
+        {
+          "task_id": "rule_switch",
+          "created_ms": 97070,
+          "finished_ms": 97224,
+          "response": "no",
+          "correct": true,
+          "rt_ms": 154,
+          "is_timeout": false,
+          "difficulty": {
+            "rule_switch_rate": 0.52,
+            "stimulus_rate_sec": 2.0,
+            "rule_complexity": 7,
+            "time_limit_ms": 2833,
+            "level": 10
+          },
+          "payload": {
+            "rule": "COLOR",
+            "target_color": "жёлтый",
+            "question_text": "Цвет: это жёлтый?"
+          }
+        },
+        {
+          "task_id": "compare_codes",
+          "created_ms": 97240,
+          "finished_ms": 97377,
+          "response": "mismatch",
+          "correct": false,
+          "rt_ms": 137,
+          "is_timeout": false,
+          "difficulty": {
+            "code_len": 7,
+            "similarity_rate": 0.53,
+            "time_limit_ms": 2833
+          },
+          "payload": {}
+        }
+      ],
+      "batch_tasks_done": 1
+    }
+  }
+}
