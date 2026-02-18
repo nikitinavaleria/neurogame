@@ -6,6 +6,7 @@
 
 - `GET /health`
 - `POST /v1/events`
+- `GET /v1/leaderboard?limit=100&min_tasks=30`
 
 Ответ на успешный прием всегда:
 
@@ -64,6 +65,51 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 `event_id` идемпотентный: дубликаты тихо игнорируются.
+
+## Streamlit leaderboard
+
+Локальный запуск:
+
+```bash
+cd backend
+streamlit run leaderboard/main.py --server.port 8501
+```
+
+Страница: `http://127.0.0.1:8501`
+
+## Docker (API + Streamlit в одном контейнере)
+
+Из корня проекта:
+
+```bash
+docker compose up --build
+```
+
+После запуска:
+- API: `http://127.0.0.1:8000`
+- leaderboard UI: `http://127.0.0.1:8501`
+
+## Минимальный запуск на сервере (без сложностей)
+
+1. На сервере клонировать проект и перейти в корень репозитория.
+2. Создать `.env` из примера:
+
+```bash
+cp .env.server.example .env
+```
+
+3. Поставить свой ключ в `.env`:
+- `NEUROGAME_API_KEY=...`
+
+4. Запустить:
+
+```bash
+docker compose up -d --build
+```
+
+Проверка:
+- `http://<server-ip>:8000/health`
+- `http://<server-ip>:8501`
 
 ## Мост в текущий формат обучения
 

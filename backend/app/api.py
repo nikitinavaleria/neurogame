@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import load_settings
 from app.db import ensure_db, write_batch
+from app.leaderboard import build_leaderboard
 
 REQUIRED_EVENT_FIELDS = ("event_id", "event_type", "event_ts", "user_id", "session_id", "payload")
 
@@ -55,3 +56,16 @@ def ingest_events(body: dict[str, Any]) -> JSONResponse:
     )
     return JSONResponse(content={"ok": True}, status_code=200)
 
+
+@app.get("/v1/leaderboard")
+def leaderboard(limit: int = 100, min_tasks: int = 30) -> dict[str, Any]:
+    safe_limit = max(1, min(500, int(limit)))
+    safe_min_tasks = max(0, int(min_tasks))
+    rows = build_leaderboard(settings.db_path, limit=safe_limit, min_tasks=safe_min_tasks)
+    return {
+        "ok": True,
+        "rows": rows,
+        "count": len(rows),
+        "limit": safe_limit,
+        "min_tasks": safe_min_tasks,
+    }
