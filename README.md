@@ -301,6 +301,16 @@ python packaging/build_desktop.py --install-deps
 - исполняемый файл: `dist/NeuroGame` (или `dist/NeuroGame.exe`)
 - архив для распространения: `dist/neurogame-<platform>.zip`
 
+Локальные данные приложения (логи/очереди) пишутся в системную папку пользователя:
+- macOS: `~/Library/Application Support/NeuroGame/`
+- Windows: `%APPDATA%\NeuroGame\`
+
+В стартовом меню есть блок `Телеметрия`, где можно:
+- увидеть текущий адрес отправки,
+- проверить связь кнопкой `Проверить`,
+- сохранить адрес кнопкой `Сохранить`.
+Игра не блокируется при отсутствии связи: события копятся в локальной очереди и отправляются позже.
+
 ## Сборка в GitHub (Mac + Windows)
 
 В проект добавлен workflow: `.github/workflows/build-release.yml`.

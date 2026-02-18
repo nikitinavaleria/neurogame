@@ -16,9 +16,15 @@ if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
 else
   ADD_DATA_SEP=":"
 fi
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name NeuroGame \
-  --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
-  "$ROOT_DIR/main.py"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  python -m PyInstaller --noconfirm --clean --windowed --name NeuroGame \
+    --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
+    "$ROOT_DIR/main.py"
+else
+  python -m PyInstaller --noconfirm --clean --onefile --windowed --name NeuroGame \
+    --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
+    "$ROOT_DIR/main.py"
+fi
 
 echo "[3/4] Preparing release archive..."
 mkdir -p "$DIST_DIR"
@@ -29,7 +35,11 @@ PY
 )"
 ARCHIVE_BASENAME="neurogame-${PLATFORM_TAG}"
 
-if [[ -f "$DIST_DIR/NeuroGame" ]]; then
+if [[ -d "$DIST_DIR/NeuroGame.app" ]]; then
+  ARCHIVE_PATH="$DIST_DIR/${ARCHIVE_BASENAME}.zip"
+  rm -f "$ARCHIVE_PATH"
+  (cd "$DIST_DIR" && zip -q -r "$(basename "$ARCHIVE_PATH")" "NeuroGame.app")
+elif [[ -f "$DIST_DIR/NeuroGame" ]]; then
   ARCHIVE_PATH="$DIST_DIR/${ARCHIVE_BASENAME}.zip"
   rm -f "$ARCHIVE_PATH"
   (cd "$DIST_DIR" && zip -q -r "$(basename "$ARCHIVE_PATH")" "NeuroGame")

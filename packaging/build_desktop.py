@@ -14,8 +14,8 @@ def run(cmd: list[str], cwd: Path) -> None:
 
 
 def zip_output(dist_dir: Path, archive_name: str) -> Path:
-    exe_candidates = [dist_dir / "NeuroGame", dist_dir / "NeuroGame.exe"]
-    target = next((p for p in exe_candidates if p.exists()), None)
+    candidates = [dist_dir / "NeuroGame.app", dist_dir / "NeuroGame", dist_dir / "NeuroGame.exe"]
+    target = next((p for p in candidates if p.exists()), None)
     if target is None:
         raise FileNotFoundError("Build output not found in dist/.")
 
@@ -23,7 +23,12 @@ def zip_output(dist_dir: Path, archive_name: str) -> Path:
     if archive_path.exists():
         archive_path.unlink()
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.write(target, arcname=target.name)
+        if target.is_dir():
+            for p in sorted(target.rglob("*")):
+                if p.is_file():
+                    zf.write(p, arcname=str(p.relative_to(target.parent)))
+        else:
+            zf.write(target, arcname=target.name)
     return archive_path
 
 
@@ -87,7 +92,6 @@ def main() -> None:
         "PyInstaller",
         "--noconfirm",
         "--clean",
-        "--onefile",
         "--windowed",
         "--name",
         "NeuroGame",
@@ -95,6 +99,9 @@ def main() -> None:
         add_data_arg,
         str(main_py),
     ]
+    # macOS dmg works more reliably with native .app (onedir).
+    if not sys.platform.startswith("darwin"):
+        build_cmd.insert(5, "--onefile")
     run(build_cmd, cwd=root)
 
     print("[3/4] Preparing release archive...")
@@ -102,7 +109,7 @@ def main() -> None:
     archive = zip_output(dist, f"neurogame-{platform_tag}.zip")
 
     print("[4/4] Done.")
-    print(f"Executable: {dist / 'NeuroGame'} (or NeuroGame.exe)")
+    print(f"Primary output dir: {dist}")
     print(f"Archive: {archive}")
 
 

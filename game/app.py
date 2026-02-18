@@ -3,6 +3,7 @@ import time
 import random
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -15,6 +16,7 @@ from config.settings import DifficultyConfig, LevelConfig, SessionConfig, Window
 from data.auth import UserAuthStore
 from data.logger import JsonlLogger
 from data.models import SessionSummary, TaskResult
+from data.paths import app_data_path, bundled_data_path
 from data.telemetry_client import TelemetryClient
 from game.task_manager import TaskManager
 from game.tasks.base import TaskRenderContext
@@ -45,9 +47,26 @@ class GameApp:
         self.current_difficulty = apply_tempo(
             apply_level(self.base_difficulty, self.current_level), self.tempo_offset
         )
-        self.adapt_logger = JsonlLogger("data/adaptations.jsonl")
+        self.events_log_path = app_data_path("events.jsonl")
+        self.adapt_log_path = app_data_path("adaptations.jsonl")
+        self.session_log_path = app_data_path("sessions.jsonl")
+        self.users_path = app_data_path("users.json")
+        self.pending_runs_path = app_data_path("pending_runs.json")
+        self.telemetry_queue_path = app_data_path("telemetry_queue.jsonl")
+        self.telemetry_settings_path = app_data_path("telemetry_settings.json")
+        self.default_telemetry_url = os.getenv(
+            "NEUROGAME_DEFAULT_TELEMETRY_URL",
+            "https://telemetry.neurogame.app/v1/events",
+        ).strip()
+        telemetry_url, telemetry_api_key = self._load_telemetry_settings()
+        self.telemetry_url_value = telemetry_url
+        self.telemetry_api_key_value = telemetry_api_key
+        self.telemetry_status_message: str = ""
+        self.telemetry_status_ok: bool = False
+        self.adapt_logger = JsonlLogger(str(self.adapt_log_path))
         self.adapt_step = 0
-        self.rl_agent = RLAgent(model_path=session.rl_model_path)
+        self.rl_model_path = self._resolve_resource_path(session.rl_model_path)
+        self.rl_agent = RLAgent(model_path=str(self.rl_model_path))
         self.last_adapt_state = None
         self.last_adapt_action = None
         self.last_adapt_reward = None
@@ -59,12 +78,13 @@ class GameApp:
             seed=1,
         )
         self.task_manager.set_level(self.current_level)
-        self.events_logger = JsonlLogger("data/events.jsonl")
-        self.session_logger = JsonlLogger("data/sessions.jsonl")
+        self.events_logger = JsonlLogger(str(self.events_log_path))
+        self.session_logger = JsonlLogger(str(self.session_log_path))
         self.telemetry = TelemetryClient(
-            endpoint_url=os.getenv("NEUROGAME_TELEMETRY_URL", "http://127.0.0.1:8000/v1/events").strip(),
-            api_key=os.getenv("NEUROGAME_TELEMETRY_API_KEY", "dev-key-change-me").strip(),
+            endpoint_url=self.telemetry_url_value,
+            api_key=self.telemetry_api_key_value,
             client_version=os.getenv("NEUROGAME_CLIENT_VERSION", "game-dev"),
+            queue_path=str(self.telemetry_queue_path),
         )
         self.session_id = f"s{int(time.time())}"
         self.results: List[TaskResult] = []
@@ -84,7 +104,7 @@ class GameApp:
         self.batch_index: int = 1
         self.planets_visited: int = 0
         self.selected_mode = self.session.adaptation_mode
-        self.auth_store = UserAuthStore("data/users.json")
+        self.auth_store = UserAuthStore(str(self.users_path))
         self.user_id: str | None = None
         self.authenticated: bool = False
         self.auth_mode: str = "login"
@@ -122,11 +142,14 @@ class GameApp:
         self.exit_button_rect: pygame.Rect | None = None
         self.mode_toggle_rect: pygame.Rect | None = None
         self.logout_button_rect: pygame.Rect | None = None
+        self.telemetry_url_rect: pygame.Rect | None = None
+        self.telemetry_save_rect: pygame.Rect | None = None
+        self.telemetry_check_rect: pygame.Rect | None = None
+        self.telemetry_input_focused: bool = False
         self.awaiting_run_setup: bool = True
         self.pause_between_levels: bool = True
         self.level_transition_toggle_rect: pygame.Rect | None = None
         self.pause_menu_open: bool = False
-        self.pending_runs_path = Path("data/pending_runs.json")
         self.persist_active_run_on_exit: bool = False
         self.partial_session_end_emitted: bool = False
 
@@ -171,6 +194,8 @@ class GameApp:
                             self._handle_auth_mouse(event.pos)
                         self._handle_auth_event(event)
                     else:
+                        if self._handle_telemetry_event(event):
+                            continue
                         if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
                             if self.awaiting_run_setup:
                                 if self._restore_saved_run():
@@ -185,7 +210,7 @@ class GameApp:
                             if self.pause_menu_open:
                                 continue
                             if self.selected_mode == "baseline":
-                                if Path(self.session.rl_model_path).exists():
+                                if self._rl_model_exists():
                                     self.selected_mode = "ppo"
                             else:
                                 self.selected_mode = "baseline"
@@ -281,7 +306,7 @@ class GameApp:
         prev_tempo = self.tempo_offset
 
         effective_mode = self.selected_mode
-        if self.selected_mode == "ppo" and Path(self.session.rl_model_path).exists():
+        if self.selected_mode == "ppo" and self._rl_model_exists():
             _, _, delta_tempo = self.rl_agent.act(state)
             new_level = prev_level
             new_tempo = max(-2, min(2, prev_tempo + delta_tempo))
@@ -496,6 +521,9 @@ class GameApp:
         self.mode_toggle_rect = None
         self.level_transition_toggle_rect = None
         self.logout_button_rect = None
+        self.telemetry_url_rect = None
+        self.telemetry_save_rect = None
+        self.telemetry_check_rect = None
 
         full = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         full.fill((6, 8, 14, 220))
@@ -630,6 +658,35 @@ class GameApp:
                 self.ui.theme.text,
                 line_h=21,
             )
+        self._render_telemetry_panel()
+
+    def _render_telemetry_panel(self) -> None:
+        panel_h = 64
+        panel = pygame.Rect(20, self.ui.h - panel_h - 8, self.ui.w - 40, panel_h)
+        pygame.draw.rect(self.screen, (15, 20, 34), panel, border_radius=10)
+        pygame.draw.rect(self.screen, self.ui.theme.border, panel, width=2, border_radius=10)
+
+        title = self.ui.font_tiny.render("Телеметрия: адрес отправки данных", True, self.ui.theme.accent)
+        self.screen.blit(title, (panel.x + 14, panel.y + 7))
+
+        self.telemetry_url_rect = pygame.Rect(panel.x + 14, panel.y + 28, panel.width - 300, 28)
+        pygame.draw.rect(self.screen, (9, 12, 22), self.telemetry_url_rect, border_radius=8)
+        border = self.ui.theme.accent if self.telemetry_input_focused else self.ui.theme.border
+        pygame.draw.rect(self.screen, border, self.telemetry_url_rect, width=2, border_radius=8)
+        url_text = self.telemetry_url_value or "https://..."
+        url_color = self.ui.theme.text if self.telemetry_url_value else (140, 150, 175)
+        url_surface = self.ui.font_tiny.render(url_text, True, url_color)
+        self.screen.blit(url_surface, (self.telemetry_url_rect.x + 8, self.telemetry_url_rect.y + 5))
+
+        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, panel.y + 28, 110, 28)
+        self._draw_compact_button(self.telemetry_check_rect, "Проверить", active=False)
+        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, panel.y + 28, 90, 28)
+        self._draw_compact_button(self.telemetry_save_rect, "Сохранить", active=True)
+
+        status_text, ok = self._telemetry_status_text()
+        status_color = self.ui.theme.accent if ok else self.ui.theme.alert
+        status_surface = self.ui.font_tiny.render(status_text, True, status_color)
+        self.screen.blit(status_surface, (panel.x + 14, panel.y + 46))
 
     def _render_auth_panel(self, rect: pygame.Rect) -> None:
         x = rect.x + 20
@@ -844,6 +901,16 @@ class GameApp:
             return
 
     def _handle_menu_mouse(self, pos: tuple[int, int]) -> None:
+        if self.telemetry_url_rect and self.telemetry_url_rect.collidepoint(pos):
+            self.telemetry_input_focused = True
+            return
+        self.telemetry_input_focused = False
+        if self.telemetry_check_rect and self.telemetry_check_rect.collidepoint(pos):
+            self._check_telemetry_connection()
+            return
+        if self.telemetry_save_rect and self.telemetry_save_rect.collidepoint(pos):
+            self._save_telemetry_url()
+            return
         if self.resume_button_rect and self.resume_button_rect.collidepoint(pos):
             if not self.awaiting_run_setup:
                 self.started = True
@@ -867,7 +934,7 @@ class GameApp:
             return
         if self.mode_toggle_rect and self.mode_toggle_rect.collidepoint(pos):
             if self.selected_mode == "baseline":
-                if Path(self.session.rl_model_path).exists():
+                if self._rl_model_exists():
                     self.selected_mode = "ppo"
             else:
                 self.selected_mode = "baseline"
@@ -938,6 +1005,90 @@ class GameApp:
         if self._has_saved_run_for_user():
             self.auth_message = "Найдена незавершенная сессия. Можно продолжить."
         self._roll_motivation_phrase()
+
+    def _load_telemetry_settings(self) -> tuple[str, str]:
+        env_url = os.getenv("NEUROGAME_TELEMETRY_URL", "").strip()
+        env_key = os.getenv("NEUROGAME_TELEMETRY_API_KEY", "").strip()
+        default_url = env_url or self.default_telemetry_url
+        default_key = env_key or "dev-key-change-me"
+
+        if not self.telemetry_settings_path.exists():
+            self._save_telemetry_settings(default_url, default_key)
+            return default_url, default_key
+        try:
+            payload = json.loads(self.telemetry_settings_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                return default_url, default_key
+            url = str(payload.get("endpoint_url", default_url)).strip() or default_url
+            key = str(payload.get("api_key", default_key)).strip() or default_key
+            if env_url:
+                url = env_url
+            if env_key:
+                key = env_key
+            return url, key
+        except (OSError, json.JSONDecodeError):
+            return default_url, default_key
+
+    def _save_telemetry_settings(self, endpoint_url: str, api_key: str) -> None:
+        payload = {
+            "endpoint_url": endpoint_url.strip(),
+            "api_key": api_key.strip(),
+        }
+        self.telemetry_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.telemetry_settings_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _telemetry_status_text(self) -> tuple[str, bool]:
+        url = self.telemetry_url_value.strip()
+        if not url:
+            return "Адрес не указан. Свяжитесь с тех. специалистом.", False
+        if not TelemetryClient.is_valid_endpoint(url):
+            return "Некорректный адрес. Укажите http(s)-адрес сервера.", False
+        if self.telemetry_status_message:
+            return self.telemetry_status_message, self.telemetry_status_ok
+        if self.telemetry.queue_size() > 0:
+            return f"Нет связи: в очереди {self.telemetry.queue_size()} событий, отправим позже.", False
+        return "Адрес настроен. Нажмите Проверить для проверки связи.", True
+
+    def _save_telemetry_url(self) -> None:
+        url = self.telemetry_url_value.strip()
+        if not TelemetryClient.is_valid_endpoint(url):
+            self.telemetry_status_message = "Некорректный адрес. Укажите http(s)-адрес."
+            self.telemetry_status_ok = False
+            return
+        self.telemetry.set_endpoint(url)
+        self._save_telemetry_settings(url, self.telemetry_api_key_value)
+        self.telemetry_status_message = "Адрес сохранен."
+        self.telemetry_status_ok = True
+
+    def _check_telemetry_connection(self) -> None:
+        self.telemetry.set_endpoint(self.telemetry_url_value.strip())
+        ok, message = self.telemetry.check_connection()
+        self.telemetry_status_message = message
+        self.telemetry_status_ok = ok
+
+    def _handle_telemetry_event(self, event: pygame.event.Event) -> bool:
+        if not self.telemetry_input_focused:
+            return False
+        if event.type != pygame.KEYDOWN:
+            return False
+        if event.key == pygame.K_RETURN:
+            self._save_telemetry_url()
+            return True
+        if event.key == pygame.K_ESCAPE:
+            self.telemetry_input_focused = False
+            return True
+        if event.key == pygame.K_BACKSPACE:
+            self.telemetry_url_value = self.telemetry_url_value[:-1]
+            return True
+        if not event.unicode or not event.unicode.isprintable():
+            return False
+        if len(self.telemetry_url_value) >= 220:
+            return True
+        self.telemetry_url_value += event.unicode
+        return True
 
     def _pause_run(self, open_pause_menu: bool = True) -> None:
         if not self._has_resumable_run():
@@ -1227,7 +1378,7 @@ class GameApp:
 
     def _load_user_progress(self, user_id: str) -> Dict[str, float]:
         lifetime_planets = self.auth_store.get_user_stat(user_id, "total_planets", 0.0)
-        path = Path("data/sessions.jsonl")
+        path = self.session_log_path
         if not path.exists():
             base = self._empty_progress()
             base["total_planets"] = lifetime_planets
@@ -1269,7 +1420,7 @@ class GameApp:
         }
 
     def _load_recent_sessions(self, user_id: str, limit: int = 20) -> List[dict]:
-        path = Path("data/sessions.jsonl")
+        path = self.session_log_path
         if not path.exists():
             return []
 
@@ -1333,9 +1484,32 @@ class GameApp:
         self.user_progress["total_planets"] = new_total
 
     def _rl_warning(self) -> str:
-        if Path(self.session.rl_model_path).exists():
+        if self._rl_model_exists():
             return ""
         return "Агент не доступен, смена невозможна"
+
+    def _resolve_resource_path(self, rel_path: str) -> Path:
+        path = Path(rel_path)
+        if path.is_absolute() and path.exists():
+            return path
+        if len(path.parts) >= 2 and path.parts[0] == "data":
+            bundled_candidate = bundled_data_path(*path.parts[1:])
+        else:
+            bundled_candidate = bundled_data_path(path.name)
+        if bundled_candidate.exists():
+            return bundled_candidate
+        cwd_candidate = Path.cwd() / path
+        if cwd_candidate.exists():
+            return cwd_candidate
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            bundle_candidate = Path(meipass) / path
+            if bundle_candidate.exists():
+                return bundle_candidate
+        return cwd_candidate
+
+    def _rl_model_exists(self) -> bool:
+        return self.rl_model_path.exists()
 
     def _render_feedback(self, now_ms: int) -> None:
         if now_ms - self.last_feedback_ms > self.last_feedback_duration_ms:
@@ -1543,8 +1717,6 @@ class GameApp:
             return
 
         self._maybe_adapt(batch)
-        self.planets_visited += 1
-        self._increment_total_planets(1)
         answer_rate = answered / max(1, self.session.total_tasks)
         answer_accuracy = (correct / answered) if answered > 0 else 0.0
 
@@ -1564,6 +1736,8 @@ class GameApp:
             elif self.selected_mode != "baseline":
                 self.tempo_offset = min(2, self.tempo_offset + 1)
             if did_level_up:
+                self.planets_visited += 1
+                self._increment_total_planets(1)
                 self.last_feedback_text = (
                     f"Ура, новый уровень! {correct}/{self.session.total_tasks} • Теперь: {self.current_level}"
                 )

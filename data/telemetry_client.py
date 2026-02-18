@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+from urllib.parse import urlparse
 
 
 def _utc_now_iso() -> str:
@@ -33,6 +34,8 @@ class TelemetryClient:
         self.queue_path.parent.mkdir(parents=True, exist_ok=True)
         self.queue: list[dict[str, Any]] = self._load_queue()
         self.last_flush_ts: float = 0.0
+        self.last_error: str = ""
+        self.last_success_ts: float = 0.0
 
     def track(
         self,
@@ -87,14 +90,68 @@ class TelemetryClient:
                 raw = resp.read().decode("utf-8") or "{}"
                 data = json.loads(raw)
                 if not isinstance(data, dict) or data.get("ok") is not True:
+                    self.last_error = "invalid_server_response"
                     return
         except (error.URLError, error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+            self.last_error = "connection_error"
             return
 
         self.queue = self.queue[len(batch) :]
+        self.last_error = ""
+        self.last_success_ts = time.time()
         self._save_queue()
         if self.queue and force:
             self.flush(force=True)
+
+    @staticmethod
+    def is_valid_endpoint(url: str) -> bool:
+        parsed = urlparse((url or "").strip())
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+    def set_endpoint(self, endpoint_url: str) -> None:
+        self.endpoint_url = endpoint_url.strip()
+        self.enabled = bool(self.endpoint_url and self.api_key)
+
+    def set_api_key(self, api_key: str) -> None:
+        self.api_key = api_key.strip()
+        self.enabled = bool(self.endpoint_url and self.api_key)
+
+    def queue_size(self) -> int:
+        return len(self.queue)
+
+    def check_connection(self) -> tuple[bool, str]:
+        if not self.enabled:
+            self.last_error = "disabled"
+            return False, "Телеметрия выключена (нет адреса или ключа)"
+        if not self.is_valid_endpoint(self.endpoint_url):
+            self.last_error = "invalid_url"
+            return False, "Неверный адрес сервера"
+
+        health_url = self.endpoint_url
+        if "/v1/events" in health_url:
+            health_url = health_url.replace("/v1/events", "/health")
+        elif health_url.endswith("/"):
+            health_url = f"{health_url}health"
+        else:
+            health_url = f"{health_url}/health"
+
+        req = request.Request(health_url, method="GET")
+        try:
+            with request.urlopen(req, timeout=self.timeout_sec) as resp:
+                if resp.status != 200:
+                    self.last_error = "health_status_error"
+                    return False, "Сервер недоступен"
+                raw = resp.read().decode("utf-8") or "{}"
+                payload = json.loads(raw)
+                if isinstance(payload, dict) and payload.get("ok") is True:
+                    self.last_error = ""
+                    self.last_success_ts = time.time()
+                    return True, "Подключение подтверждено"
+                self.last_error = "health_payload_error"
+                return False, "Сервер ответил некорректно"
+        except (error.URLError, error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+            self.last_error = "connection_error"
+            return False, "Нет связи с сервером"
 
     def _load_queue(self) -> list[dict[str, Any]]:
         if not self.queue_path.exists():
@@ -114,9 +171,14 @@ class TelemetryClient:
         return events
 
     def _save_queue(self) -> None:
+        if not self.queue:
+            try:
+                self.queue_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return
         tmp = self.queue_path.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             for item in self.queue:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
         tmp.replace(self.queue_path)
-
