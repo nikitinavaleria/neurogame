@@ -64,6 +64,19 @@ backend/data/*.db
 backend/data/*.db-shm
 backend/data/*.db-wal
 data/telemetry_queue.jsonl
+data/_appdata/
+
+# NeuroGame runtime artifacts
+data/events.jsonl
+data/adaptations.jsonl
+data/sessions.jsonl
+data/pending_runs.json
+data/users.json
+dist/NeuroGame
+dist/NeuroGame.exe
+dist/neurogame-*.zip
+dist/NeuroGame.app/
+dist/NeuroGame.dmg
 
 # Flask stuff:
 instance/

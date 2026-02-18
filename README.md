@@ -323,3 +323,32 @@ python packaging/build_desktop.py --install-deps
 5. После завершения скачай артефакты:
 - `neurogame-macos` (внутри `NeuroGame.dmg`)
 - `neurogame-windows` (внутри `NeuroGameSetup.exe`)
+
+## Чистка локальных артефактов
+
+Для безопасной очистки локального окружения (без изменения кода) есть скрипт:
+
+```bash
+bash scripts/cleanup_local_artifacts.sh
+```
+
+Что удаляет по умолчанию:
+- `build/`
+- `dist/`
+- `backend/data/events.db`
+- `data/telemetry_queue.jsonl`
+- `data/_appdata/`
+- локальные `__pycache__/`
+
+Если нужно также удалить локальные логи/снапшоты пользователей:
+
+```bash
+bash scripts/cleanup_local_artifacts.sh --with-logs
+```
+
+Этот режим дополнительно удаляет:
+- `data/events.jsonl`
+- `data/adaptations.jsonl`
+- `data/sessions.jsonl`
+- `data/pending_runs.json`
+- `data/users.json`

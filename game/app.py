@@ -16,8 +16,33 @@ from config.settings import DifficultyConfig, LevelConfig, SessionConfig, Window
 from data.auth import UserAuthStore
 from data.logger import JsonlLogger
 from data.models import SessionSummary, TaskResult
+from data.pending_runs_store import (
+    load_pending_runs as load_pending_runs_file,
+    save_pending_runs as save_pending_runs_file,
+)
 from data.paths import app_data_path, bundled_data_path
+from data.telemetry_settings import (
+    load_telemetry_settings as load_telemetry_settings_file,
+    save_telemetry_settings as save_telemetry_settings_file,
+)
 from data.telemetry_client import TelemetryClient
+from game.input_handlers import (
+    handle_auth_event,
+    handle_auth_mouse,
+    handle_menu_mouse,
+    handle_pause_menu_mouse,
+    handle_telemetry_event,
+)
+from game.session_metrics import (
+    build_state_vector,
+    compute_flight_progress,
+    compute_fatigue_trend,
+    compute_zone_quality,
+    compute_reward,
+    compute_switch_cost,
+    count_successes,
+    task_title,
+)
 from game.task_manager import TaskManager
 from game.tasks.base import TaskRenderContext
 from game.ui import GameUI
@@ -855,131 +880,16 @@ class GameApp:
         self.screen.blit(text, text_rect)
 
     def _handle_auth_event(self, event: pygame.event.Event) -> None:
-        if event.type != pygame.KEYDOWN:
-            return
-        if event.key == pygame.K_TAB:
-            self.auth_focus = "password" if self.auth_focus == "username" else "username"
-            return
-        if event.key in (pygame.K_F2, pygame.K_m):
-            self.auth_mode = "register" if self.auth_mode == "login" else "login"
-            self.auth_message = "Режим: регистрация" if self.auth_mode == "register" else "Режим: вход"
-            return
-        if event.key == pygame.K_RETURN:
-            self._submit_auth()
-            return
-        if event.key == pygame.K_BACKSPACE:
-            if self.auth_focus == "username":
-                self.auth_username = self.auth_username[:-1]
-            else:
-                self.auth_password = self.auth_password[:-1]
-            return
-        if not event.unicode or not event.unicode.isprintable():
-            return
-        char = event.unicode
-        if self.auth_focus == "username":
-            if len(self.auth_username) >= 24:
-                return
-            if char.isalnum() or char in "._-":
-                self.auth_username += char
-        else:
-            if len(self.auth_password) < 32:
-                self.auth_password += char
+        handle_auth_event(self, event)
 
     def _handle_auth_mouse(self, pos: tuple[int, int]) -> None:
-        if self.auth_username_rect and self.auth_username_rect.collidepoint(pos):
-            self.auth_focus = "username"
-            return
-        if self.auth_password_rect and self.auth_password_rect.collidepoint(pos):
-            self.auth_focus = "password"
-            return
-        if self.auth_toggle_rect and self.auth_toggle_rect.collidepoint(pos):
-            self.auth_mode = "register" if self.auth_mode == "login" else "login"
-            self.auth_message = "Режим: регистрация" if self.auth_mode == "register" else "Режим: вход"
-            return
-        if self.auth_submit_rect and self.auth_submit_rect.collidepoint(pos):
-            self._submit_auth()
-            return
+        handle_auth_mouse(self, pos)
 
     def _handle_menu_mouse(self, pos: tuple[int, int]) -> None:
-        if self.telemetry_url_rect and self.telemetry_url_rect.collidepoint(pos):
-            self.telemetry_input_focused = True
-            return
-        self.telemetry_input_focused = False
-        if self.telemetry_check_rect and self.telemetry_check_rect.collidepoint(pos):
-            self._check_telemetry_connection()
-            return
-        if self.telemetry_save_rect and self.telemetry_save_rect.collidepoint(pos):
-            self._save_telemetry_url()
-            return
-        if self.resume_button_rect and self.resume_button_rect.collidepoint(pos):
-            if not self.awaiting_run_setup:
-                self.started = True
-                return
-            if self.awaiting_run_setup and self._restore_saved_run():
-                return
-            level = int(self.user_progress.get("last_level", 1))
-            self._begin_user_run(max(1, level))
-            return
-        if self.restart_button_rect and self.restart_button_rect.collidepoint(pos):
-            self._begin_user_run(1)
-            return
-        if self.start_button_rect and self.start_button_rect.collidepoint(pos):
-            if self.awaiting_run_setup:
-                self._begin_user_run(1)
-            else:
-                self.started = True
-            return
-        if self.menu_button_rect and self.menu_button_rect.collidepoint(pos):
-            self._pause_run(open_pause_menu=True)
-            return
-        if self.mode_toggle_rect and self.mode_toggle_rect.collidepoint(pos):
-            if self.selected_mode == "baseline":
-                if self._rl_model_exists():
-                    self.selected_mode = "ppo"
-            else:
-                self.selected_mode = "baseline"
-            return
-        if self.level_transition_toggle_rect and self.level_transition_toggle_rect.collidepoint(pos):
-            self.pause_between_levels = not self.pause_between_levels
-            return
-        if self.logout_button_rect and self.logout_button_rect.collidepoint(pos):
-            self._logout_user()
-            return
-        if self.exit_button_rect and self.exit_button_rect.collidepoint(pos):
-            self._exit_app()
-            return
+        handle_menu_mouse(self, pos)
 
     def _handle_pause_menu_mouse(self, pos: tuple[int, int]) -> None:
-        if self.resume_button_rect and self.resume_button_rect.collidepoint(pos):
-            self.pause_menu_open = False
-            self.started = True
-            self.telemetry.track(
-                event_type="session_resume",
-                user_id=self.user_id,
-                session_id=self.session_id,
-                model_version=f"{self.selected_mode}_v1",
-                payload={
-                    "session_id": self.session_id,
-                    "user_id": self.user_id,
-                    "mode": self.selected_mode,
-                    "source": "pause_menu_button",
-                },
-            )
-            return
-        if self.menu_button_rect and self.menu_button_rect.collidepoint(pos):
-            self.pause_menu_open = False
-            self.started = False
-            self._save_active_run_snapshot()
-            return
-        if self.restart_button_rect and self.restart_button_rect.collidepoint(pos):
-            self._begin_user_run(1)
-            return
-        if self.logout_button_rect and self.logout_button_rect.collidepoint(pos):
-            self._logout_user()
-            return
-        if self.exit_button_rect and self.exit_button_rect.collidepoint(pos):
-            self._exit_app()
-            return
+        handle_pause_menu_mouse(self, pos)
 
     def _submit_auth(self) -> None:
         username = self.auth_username.strip()
@@ -1009,35 +919,19 @@ class GameApp:
     def _load_telemetry_settings(self) -> tuple[str, str]:
         env_url = os.getenv("NEUROGAME_TELEMETRY_URL", "").strip()
         env_key = os.getenv("NEUROGAME_TELEMETRY_API_KEY", "").strip()
-        default_url = env_url or self.default_telemetry_url
-        default_key = env_key or "dev-key-change-me"
-
-        if not self.telemetry_settings_path.exists():
-            self._save_telemetry_settings(default_url, default_key)
-            return default_url, default_key
-        try:
-            payload = json.loads(self.telemetry_settings_path.read_text(encoding="utf-8"))
-            if not isinstance(payload, dict):
-                return default_url, default_key
-            url = str(payload.get("endpoint_url", default_url)).strip() or default_url
-            key = str(payload.get("api_key", default_key)).strip() or default_key
-            if env_url:
-                url = env_url
-            if env_key:
-                key = env_key
-            return url, key
-        except (OSError, json.JSONDecodeError):
-            return default_url, default_key
+        return load_telemetry_settings_file(
+            settings_path=self.telemetry_settings_path,
+            default_url=self.default_telemetry_url,
+            default_key="dev-key-change-me",
+            env_url=env_url,
+            env_key=env_key,
+        )
 
     def _save_telemetry_settings(self, endpoint_url: str, api_key: str) -> None:
-        payload = {
-            "endpoint_url": endpoint_url.strip(),
-            "api_key": api_key.strip(),
-        }
-        self.telemetry_settings_path.parent.mkdir(parents=True, exist_ok=True)
-        self.telemetry_settings_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        save_telemetry_settings_file(
+            settings_path=self.telemetry_settings_path,
+            endpoint_url=endpoint_url,
+            api_key=api_key,
         )
 
     def _telemetry_status_text(self) -> tuple[str, bool]:
@@ -1070,25 +964,7 @@ class GameApp:
         self.telemetry_status_ok = ok
 
     def _handle_telemetry_event(self, event: pygame.event.Event) -> bool:
-        if not self.telemetry_input_focused:
-            return False
-        if event.type != pygame.KEYDOWN:
-            return False
-        if event.key == pygame.K_RETURN:
-            self._save_telemetry_url()
-            return True
-        if event.key == pygame.K_ESCAPE:
-            self.telemetry_input_focused = False
-            return True
-        if event.key == pygame.K_BACKSPACE:
-            self.telemetry_url_value = self.telemetry_url_value[:-1]
-            return True
-        if not event.unicode or not event.unicode.isprintable():
-            return False
-        if len(self.telemetry_url_value) >= 220:
-            return True
-        self.telemetry_url_value += event.unicode
-        return True
+        return handle_telemetry_event(self, event)
 
     def _pause_run(self, open_pause_menu: bool = True) -> None:
         if not self._has_resumable_run():
@@ -1161,23 +1037,10 @@ class GameApp:
         return self.authenticated and (self.started or not self.awaiting_run_setup)
 
     def _load_pending_runs(self) -> dict:
-        if not self.pending_runs_path.exists():
-            return {}
-        try:
-            payload = json.loads(self.pending_runs_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
-        runs = payload.get("runs")
-        if isinstance(runs, dict):
-            return runs
-        return {}
+        return load_pending_runs_file(self.pending_runs_path)
 
     def _save_pending_runs(self, runs: dict) -> None:
-        self.pending_runs_path.parent.mkdir(parents=True, exist_ok=True)
-        self.pending_runs_path.write_text(
-            json.dumps({"runs": runs}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        save_pending_runs_file(self.pending_runs_path, runs)
 
     def _has_saved_run_for_user(self) -> bool:
         if not self.user_id:
@@ -1573,13 +1436,7 @@ class GameApp:
 
     @staticmethod
     def _task_title(task_id: str) -> str:
-        return {
-            "compare_codes": "Сравнение кодов",
-            "sequence_memory": "Память",
-            "rule_switch": "Смена правила",
-            "parity_check": "Четность числа",
-            "radar_scan": "Радарный сигнал",
-        }.get(task_id, task_id)
+        return task_title(task_id)
 
     def _encode_action(self, prev_level: int, prev_tempo: int) -> tuple:
         delta_level = max(-1, min(1, self.current_level - prev_level))
@@ -1588,100 +1445,40 @@ class GameApp:
         return action_id, delta_level, delta_tempo
 
     def _build_state(self, window: List[TaskResult]) -> list:
-        acc = sum(1 for r in window if r.correct) / len(window)
-        rts = [r.rt_ms for r in window if r.rt_ms is not None]
-        mean_rt = sum(rts) / len(rts) if rts else 0.0
-        std_rt = 0.0
-        if len(rts) > 1:
-            mean = mean_rt
-            std_rt = (sum((x - mean) ** 2 for x in rts) / len(rts)) ** 0.5
-
-        error_streak = 0
-        for r in reversed(window):
-            if r.correct:
-                break
-            error_streak += 1
-
-        switch_cost = self._compute_switch_cost(window)
-        fatigue_trend = self._compute_fatigue_trend(window)
         g = self.current_difficulty.global_params
-        return [
-            acc,
-            mean_rt,
-            std_rt,
-            float(error_streak),
-            switch_cost,
-            fatigue_trend,
-            float(self.current_level),
-            g.event_rate_sec,
-            g.time_pressure,
-            float(g.parallel_streams),
-            float(g.task_mix[0]),
-            float(g.task_mix[1]),
-        ]
+        return build_state_vector(
+            window=window,
+            current_level=self.current_level,
+            event_rate_sec=g.event_rate_sec,
+            time_pressure=g.time_pressure,
+            parallel_streams=g.parallel_streams,
+            task_mix=g.task_mix,
+        )
 
     @staticmethod
     def _compute_reward(acc: float, mean_rt: float) -> float:
-        reward = acc - 0.7
-        if mean_rt > 1000:
-            reward -= 0.0004 * (mean_rt - 1000)
-        return reward
+        return compute_reward(acc, mean_rt)
 
     def _current_zone_quality(self) -> float:
         batch = self.results[self.batch_result_start :]
         window = batch[-8:]
-        if not window:
-            return 0.0
-        accuracy = sum(1 for r in window if r.correct) / len(window)
-        rts = [r.rt_ms for r in window if r.rt_ms is not None]
-        if not rts:
-            return max(0.0, min(1.0, accuracy))
-        mean_rt = sum(rts) / len(rts)
-        rt_penalty = max(0.0, min(0.5, (mean_rt - 1400.0) / 2200.0))
-        return max(0.0, min(1.0, accuracy - rt_penalty))
+        return compute_zone_quality(window)
 
     def _current_flight_progress(self) -> float:
         successes = self._current_flight_successes()
-        return max(0.0, min(1.0, successes / max(1, self.session.total_tasks)))
+        return compute_flight_progress(successes, self.session.total_tasks)
 
     def _current_flight_successes(self) -> int:
         current_batch = self.results[self.batch_result_start :]
-        if not current_batch:
-            return 0
-        return sum(1 for r in current_batch if r.correct and not r.is_timeout)
+        return count_successes(current_batch)
 
     @staticmethod
     def _compute_fatigue_trend(window: List[TaskResult]) -> float:
-        rts = [r.rt_ms for r in window if r.rt_ms is not None]
-        if len(rts) < 2:
-            return 0.0
-        n = len(rts)
-        xs = list(range(n))
-        mean_x = (n - 1) / 2
-        mean_y = sum(rts) / n
-        num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, rts))
-        den = sum((x - mean_x) ** 2 for x in xs) or 1.0
-        return num / den
+        return compute_fatigue_trend(window)
 
     @staticmethod
     def _compute_switch_cost(window: List[TaskResult]) -> float:
-        switch_rts = []
-        nonswitch_rts = []
-        prev_rule = None
-        for r in window:
-            if r.task_id != "rule_switch":
-                continue
-            rule = r.payload.get("rule")
-            if rule is None or r.rt_ms is None:
-                continue
-            if prev_rule is not None and rule != prev_rule:
-                switch_rts.append(r.rt_ms)
-            else:
-                nonswitch_rts.append(r.rt_ms)
-            prev_rule = rule
-        if not switch_rts or not nonswitch_rts:
-            return 0.0
-        return (sum(switch_rts) / len(switch_rts)) - (sum(nonswitch_rts) / len(nonswitch_rts))
+        return compute_switch_cost(window)
 
     def _start_next_batch(self) -> None:
         batch = self.results[self.batch_result_start :]
