@@ -1,0 +1,15 @@
+services:
+  neurogame-platform:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: neurogame-platform
+    ports:
+      - "${API_PORT:-8000}:8000"
+      - "${LEADERBOARD_PORT:-8501}:8501"
+    environment:
+      - NEUROGAME_API_KEY=${NEUROGAME_API_KEY:-dev-key-change-me}
+      - NEUROGAME_DB_PATH=${NEUROGAME_DB_PATH:-/app/backend/data/events.db}
+    volumes:
+      - ./backend/data:/app/backend/data
+    restart: unless-stopped
