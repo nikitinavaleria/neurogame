@@ -45,6 +45,7 @@ def main() -> None:
     dist = root / "dist"
     main_py = root / "main.py"
     data_dir = root / "data"
+    assets_dir = root / "game" / "assets"
 
     print("[1/4] Checking PyInstaller...")
     pyinstaller_installed = importlib.util.find_spec("PyInstaller") is not None
@@ -86,6 +87,7 @@ def main() -> None:
     print("[2/4] Building desktop executable...")
     add_data_sep = ";" if sys.platform.startswith("win") else ":"
     add_data_arg = f"{data_dir}{add_data_sep}data"
+    add_assets_arg = f"{assets_dir}{add_data_sep}game/assets"
     build_cmd = [
         sys.executable,
         "-m",
@@ -97,6 +99,8 @@ def main() -> None:
         "NeuroGame",
         "--add-data",
         add_data_arg,
+        "--add-data",
+        add_assets_arg,
         str(main_py),
     ]
     # macOS dmg works more reliably with native .app (onedir).

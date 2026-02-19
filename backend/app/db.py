@@ -90,3 +90,46 @@ def write_batch(db_path: Path, api_key: str, client_version: str, events: list[d
         )
         conn.commit()
 
+
+def read_raw_events(
+    db_path: Path,
+    limit: int = 1000,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(5000, int(limit)))
+    safe_offset = max(0, int(offset))
+    if not db_path.exists():
+        return []
+
+    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
+        cur = conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT event_id, event_type, event_ts, user_id, session_id, model_version, payload_json
+            FROM events_raw
+            ORDER BY id ASC
+            LIMIT ? OFFSET ?
+            """,
+            (safe_limit, safe_offset),
+        ).fetchall()
+
+    records: list[dict[str, Any]] = []
+    for event_id, event_type, event_ts, user_id, session_id, model_version, payload_json in rows:
+        try:
+            payload = json.loads(payload_json) if payload_json else {}
+        except json.JSONDecodeError:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        records.append(
+            {
+                "event_id": event_id,
+                "event_type": event_type,
+                "event_ts": event_ts,
+                "user_id": user_id,
+                "session_id": session_id,
+                "model_version": model_version,
+                "payload": payload,
+            }
+        )
+    return records

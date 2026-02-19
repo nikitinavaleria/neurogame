@@ -16,13 +16,16 @@ if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
 else
   ADD_DATA_SEP=":"
 fi
+ASSETS_DIR="$ROOT_DIR/game/assets"
 if [[ "$OSTYPE" == "darwin"* ]]; then
   python -m PyInstaller --noconfirm --clean --windowed --name NeuroGame \
     --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
+    --add-data "$ASSETS_DIR${ADD_DATA_SEP}game/assets" \
     "$ROOT_DIR/main.py"
 else
   python -m PyInstaller --noconfirm --clean --onefile --windowed --name NeuroGame \
     --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
+    --add-data "$ASSETS_DIR${ADD_DATA_SEP}game/assets" \
     "$ROOT_DIR/main.py"
 fi
 

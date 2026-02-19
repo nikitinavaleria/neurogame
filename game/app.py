@@ -9,23 +9,23 @@ from typing import Dict, List
 
 import pygame
 
-from adaptation.baseline import BaselineAdapter, BaselineState
-from adaptation.levels import apply_level, apply_tempo
-from adaptation.rl_agent import RLAgent
-from config.settings import DifficultyConfig, LevelConfig, SessionConfig, WindowConfig
-from data.auth import UserAuthStore
-from data.logger import JsonlLogger
-from data.models import SessionSummary, TaskResult
-from data.pending_runs_store import (
+from game.adaptation.baseline import BaselineAdapter, BaselineState
+from game.adaptation.levels import apply_level, apply_tempo
+from game.adaptation.rl_agent import RLAgent
+from game.settings import DifficultyConfig, LevelConfig, SessionConfig, WindowConfig
+from game.runtime.auth import UserAuthStore
+from game.runtime.logger import JsonlLogger
+from game.runtime.models import SessionSummary, TaskResult
+from game.runtime.pending_runs_store import (
     load_pending_runs as load_pending_runs_file,
     save_pending_runs as save_pending_runs_file,
 )
-from data.paths import app_data_path, bundled_data_path
-from data.telemetry_settings import (
+from game.runtime.paths import app_data_path, bundled_data_path, bundled_resource_path
+from game.runtime.telemetry_settings import (
     load_telemetry_settings as load_telemetry_settings_file,
     save_telemetry_settings as save_telemetry_settings_file,
 )
-from data.telemetry_client import TelemetryClient
+from game.runtime.telemetry_client import TelemetryClient
 from game.input_handlers import (
     handle_auth_event,
     handle_auth_mouse,
@@ -51,8 +51,9 @@ from game.ui import GameUI
 class GameApp:
     def __init__(self, window: WindowConfig, session: SessionConfig, difficulty: DifficultyConfig) -> None:
         pygame.init()
-        flags = pygame.RESIZABLE | pygame.DOUBLEBUF
-        self.screen = pygame.display.set_mode((window.width, window.height), flags, vsync=1)
+        self.display_flags = pygame.RESIZABLE | pygame.DOUBLEBUF
+        initial_size = self._pick_initial_window_size(window.width, window.height)
+        self.screen = pygame.display.set_mode(initial_size, self.display_flags, vsync=1)
         pygame.display.set_caption(window.title)
         self.clock = pygame.time.Clock()
         self.ui = GameUI(self.screen)
@@ -178,12 +179,32 @@ class GameApp:
         self.persist_active_run_on_exit: bool = False
         self.partial_session_end_emitted: bool = False
 
+    @staticmethod
+    def _pick_initial_window_size(target_w: int, target_h: int) -> tuple[int, int]:
+        info = pygame.display.Info()
+        display_w = int(getattr(info, "current_w", target_w) or target_w)
+        display_h = int(getattr(info, "current_h", target_h) or target_h)
+        max_w = max(900, int(display_w * 0.96))
+        max_h = max(600, int(display_h * 0.92))
+        width = max(900, min(int(target_w), max_w))
+        height = max(600, min(int(target_h), max_h))
+        return width, height
+
+    def _apply_window_resize(self, width: int, height: int) -> None:
+        new_w = max(900, int(width))
+        new_h = max(600, int(height))
+        self.screen = pygame.display.set_mode((new_w, new_h), self.display_flags, vsync=1)
+        self.ui = GameUI(self.screen)
+
     def run(self) -> None:
         while self.running:
             self.clock.tick(self.window.fps)
             now_ms = pygame.time.get_ticks()
 
             for event in pygame.event.get():
+                if event.type == pygame.VIDEORESIZE:
+                    self._apply_window_resize(event.w, event.h)
+                    continue
                 if event.type == pygame.QUIT:
                     if self._has_resumable_run():
                         self._emit_partial_session_end(reason="window_close")
@@ -1355,6 +1376,9 @@ class GameApp:
         path = Path(rel_path)
         if path.is_absolute() and path.exists():
             return path
+        bundled_resource_candidate = bundled_resource_path(*path.parts)
+        if bundled_resource_candidate.exists():
+            return bundled_resource_candidate
         if len(path.parts) >= 2 and path.parts[0] == "data":
             bundled_candidate = bundled_data_path(*path.parts[1:])
         else:

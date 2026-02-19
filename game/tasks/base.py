@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple
 
 import pygame
 
-from data.models import TaskResult, TaskSpec
+from game.runtime.models import TaskResult, TaskSpec
 
 
 @dataclass

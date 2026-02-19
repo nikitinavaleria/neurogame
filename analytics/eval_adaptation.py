@@ -1,4 +1,3 @@
-import argparse
 import json
 import random
 from dataclasses import dataclass
@@ -112,52 +111,77 @@ def print_metric_report(name: str, baseline: List[float], adaptive: List[float],
     )
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate baseline vs adaptive sessions")
-    parser.add_argument("--events", default="data/events.jsonl")
-    args = parser.parse_args()
-
-    events = load_events(args.events)
-    if not events:
-        print(f"Нет данных: {args.events}")
-        return
-
+def compare_modes(events: List[dict]) -> dict:
     sessions = split_by_session(events)
     summaries = [summarize_session(evts) for evts in sessions.values() if evts]
     baseline_stats = [s for s in summaries if s.mode == "baseline"]
     adaptive_stats = [s for s in summaries if s.mode == "ppo"]
+    return {
+        "baseline_sessions": len(baseline_stats),
+        "adaptive_sessions": len(adaptive_stats),
+        "accuracy_total": {
+            "baseline": metric_values(baseline_stats, "accuracy_total"),
+            "adaptive": metric_values(adaptive_stats, "accuracy_total"),
+        },
+        "mean_rt": {
+            "baseline": metric_values(baseline_stats, "mean_rt"),
+            "adaptive": metric_values(adaptive_stats, "mean_rt"),
+        },
+        "rt_variance": {
+            "baseline": metric_values(baseline_stats, "rt_variance"),
+            "adaptive": metric_values(adaptive_stats, "rt_variance"),
+        },
+        "answered_rate": {
+            "baseline": metric_values(baseline_stats, "answered_rate"),
+            "adaptive": metric_values(adaptive_stats, "answered_rate"),
+        },
+        "level_gain": {
+            "baseline": metric_values(baseline_stats, "level_gain"),
+            "adaptive": metric_values(adaptive_stats, "level_gain"),
+        },
+    }
 
-    print(f"Сессий baseline: {len(baseline_stats)}")
-    print(f"Сессий adaptive(ppo): {len(adaptive_stats)}")
+
+def main() -> None:
+    events_path = "analytics/data/events.jsonl"
+    events = load_events(events_path)
+    if not events:
+        print(f"Нет данных: {events_path}")
+        return
+
+    report = compare_modes(events)
+
+    print(f"Сессий baseline: {report['baseline_sessions']}")
+    print(f"Сессий adaptive(ppo): {report['adaptive_sessions']}")
 
     print_metric_report(
         "accuracy_total",
-        metric_values(baseline_stats, "accuracy_total"),
-        metric_values(adaptive_stats, "accuracy_total"),
+        report["accuracy_total"]["baseline"],
+        report["accuracy_total"]["adaptive"],
         higher_is_better=True,
     )
     print_metric_report(
         "mean_rt",
-        metric_values(baseline_stats, "mean_rt"),
-        metric_values(adaptive_stats, "mean_rt"),
+        report["mean_rt"]["baseline"],
+        report["mean_rt"]["adaptive"],
         higher_is_better=False,
     )
     print_metric_report(
         "rt_variance",
-        metric_values(baseline_stats, "rt_variance"),
-        metric_values(adaptive_stats, "rt_variance"),
+        report["rt_variance"]["baseline"],
+        report["rt_variance"]["adaptive"],
         higher_is_better=False,
     )
     print_metric_report(
         "answered_rate",
-        metric_values(baseline_stats, "answered_rate"),
-        metric_values(adaptive_stats, "answered_rate"),
+        report["answered_rate"]["baseline"],
+        report["answered_rate"]["adaptive"],
         higher_is_better=True,
     )
     print_metric_report(
         "level_gain",
-        metric_values(baseline_stats, "level_gain"),
-        metric_values(adaptive_stats, "level_gain"),
+        report["level_gain"]["baseline"],
+        report["level_gain"]["adaptive"],
         higher_is_better=True,
     )
 

@@ -1,4 +1,4 @@
-from config.settings import DifficultyConfig, SessionConfig, WindowConfig
+from game.settings import DifficultyConfig, SessionConfig, WindowConfig
 from game.app import GameApp
 
 

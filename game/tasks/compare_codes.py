@@ -3,7 +3,7 @@ from typing import Tuple
 
 import pygame
 
-from data.models import TaskSpec
+from game.runtime.models import TaskSpec
 from game.tasks.base import TaskBase, TaskRenderContext
 from game.tasks.input_utils import read_left_right_key
 

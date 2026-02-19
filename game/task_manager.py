@@ -1,8 +1,8 @@
 import random
 from typing import List, Optional
 
-from config.settings import DifficultyConfig
-from data.models import TaskResult, TaskSpec
+from game.settings import DifficultyConfig
+from game.runtime.models import TaskResult, TaskSpec
 from game.tasks import CompareCodesTask, ParityCheckTask, RadarScanTask, RuleSwitchTask, SequenceMemoryTask
 from game.tasks.base import TaskBase
 

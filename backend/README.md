@@ -7,6 +7,7 @@
 - `GET /health`
 - `POST /v1/events`
 - `GET /v1/leaderboard?limit=100&min_tasks=30`
+- `GET /v1/export/raw?api_key=...&limit=1000&offset=0`
 
 Ответ на успешный прием всегда:
 
@@ -111,21 +112,7 @@ docker compose up -d --build
 - `http://<server-ip>:8000/health`
 - `http://<server-ip>:8501`
 
-## Мост в текущий формат обучения
+## Пайплайн обучения из server-данных
 
-Чтобы использовать текущий пайплайн (`data/events.jsonl`, `data/adaptations.jsonl`, `data/sessions.jsonl`), есть скрипт-экспортер:
-
-```bash
-python backend/scripts/export_bridge.py \
-  --db backend/data/events.db \
-  --events-out data/events.jsonl \
-  --adaptations-out data/adaptations.jsonl \
-  --sessions-out data/sessions.jsonl
-```
-
-Скрипт можно запускать кнопкой Run без аргументов: у него дефолтные абсолютные пути по проекту.
-
-Скрипт экспортирует:
-- `event_type=task_result` -> `data/events.jsonl`
-- `event_type=adaptation_step` -> `data/adaptations.jsonl`
-- `event_type=session_end` и `event_type=session_end_partial` -> `data/sessions.jsonl`
+Для выгрузки и обучения используй `training/pipeline.py` (запуск из PyCharm).
+Параметры задаются в `RUN_CONFIG` внутри файла.

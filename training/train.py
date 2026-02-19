@@ -5,14 +5,15 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
+from game.settings import SessionConfig
 from training.dataset import build_transitions, load_adaptations
 from training.model import ActorCritic
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train adaptation model from adaptations.jsonl")
-    parser.add_argument("--data", default="data/adaptations.jsonl")
-    parser.add_argument("--out", default="data/ppo_agent.pt")
+    parser.add_argument("--data", default="training/data/adaptations.jsonl")
+    parser.add_argument("--out", default=SessionConfig().rl_model_path)
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)

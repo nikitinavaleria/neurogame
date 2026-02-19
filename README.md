@@ -128,10 +128,11 @@
 
 - `game/` - игровой цикл, рендер, интерфейс
 - `game/tasks/` - micro-задачи
-- `adaptation/` - контроллер сложности и RL-агент
+- `game/adaptation/` - контроллер сложности и RL-агент
+- `game/runtime/` - игровые модели/логирование/пути/телеметрия
 - `analytics/` - анализ логов и визуализация метрик
 - `data/` - игровые логи и данные эксперимента
-- `config/` - параметры экспериментов и настроек
+- `game/settings.py` - параметры игры и сложности
 
 ## Дизайн и UX
 
@@ -260,17 +261,17 @@
 
 ### 1) Сбор данных в игре
 - Запусти игру в baseline и/или adaptive режиме.
-- Логи пишутся в:
-  - `data/events.jsonl`
-  - `data/adaptations.jsonl`
-  - `data/sessions.jsonl`
-- В `data/adaptations.jsonl` каждая запись содержит `session_id`, `batch_index`, `state`, `action_id`, `reward`, `mode`.
+- Для обучения рабочий датасет хранится в:
+  - `training/data/events.jsonl`
+  - `training/data/adaptations.jsonl`
+  - `training/data/sessions.jsonl`
+- В `training/data/adaptations.jsonl` каждая запись содержит `session_id`, `batch_index`, `state`, `action_id`, `reward`, `mode`.
   - `action_space` = `tempo3` (действие кодирует только изменение темпа: `0=-1`, `1=0`, `2=+1`).
   - адаптация применяется по завершению батча (этапа), синхронно с логикой уровней.
 
 ### 2) Обучение модели
 ```bash
-python -m training.train --data data/adaptations.jsonl --out data/ppo_agent.pt --epochs 40 --batch-size 64 --gamma 0.97 --mode all
+python -m training.train --data training/data/adaptations.jsonl --out game/assets/models/ppo_agent.pt --epochs 40 --batch-size 64 --gamma 0.97 --mode all
 ```
 Опции `--mode`:
 - `all` — использовать все записи
@@ -278,11 +279,27 @@ python -m training.train --data data/adaptations.jsonl --out data/ppo_agent.pt -
 - `ppo` — только adaptive/ppo-сегменты
 
 После обучения сохраняются:
-- веса: `data/ppo_agent.pt`
-- метаданные: `data/ppo_agent.meta.json`
+- веса: `game/assets/models/ppo_agent.pt`
+- метаданные: `game/assets/models/ppo_agent.meta.json`
+
+### 2b) Единый pipeline: сервер -> датасет -> обучение
+
+Если данные уже на сервере backend, запускай файл `training/pipeline.py` из PyCharm.
+Все параметры задаются прямо в коде в `RUN_CONFIG`:
+- `server`
+- `api_key`
+- `out_dir`
+- `model_out_path`
+- `train_mode`
+- `skip_train` и параметры обучения
+
+Pipeline:
+- забирает события с `/v1/export/raw`,
+- формирует `training/data/events|adaptations|sessions.jsonl`,
+- запускает `training.train`.
 
 ### 3) Использование модели в игре
-- Файл модели должен быть доступен по пути `data/ppo_agent.pt`.
+- Файл модели должен быть доступен по пути `game/assets/models/ppo_agent.pt`.
 - На стартовом экране переключи режим на `адаптивный`.
 
 ## Сборка Desktop-версии (PyInstaller)
@@ -347,8 +364,8 @@ bash scripts/cleanup_local_artifacts.sh --with-logs
 ```
 
 Этот режим дополнительно удаляет:
-- `data/events.jsonl`
-- `data/adaptations.jsonl`
-- `data/sessions.jsonl`
+- `training/data/events.jsonl`
+- `training/data/adaptations.jsonl`
+- `training/data/sessions.jsonl`
 - `data/pending_runs.json`
 - `data/users.json`

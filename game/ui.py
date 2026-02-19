@@ -27,13 +27,23 @@ class GameUI:
         self.font_tiny = self._make_font(17)
         self.stars = self._build_stars(80)
 
-        margin = 20
-        top = 84
-        gap = 20
-        main_h = self.h - top - margin
-        left_w = 250
-        right_w = 330
-        center_w = self.w - (margin * 2) - (gap * 2) - left_w - right_w
+        margin = max(8, min(20, self.w // 70))
+        top = max(60, min(84, self.h // 12))
+        gap = max(8, min(20, self.w // 80))
+        main_h = max(260, self.h - top - margin)
+        available_w = max(320, self.w - (margin * 2) - (gap * 2))
+
+        left_w = max(150, min(250, int(available_w * 0.22)))
+        right_w = max(220, min(330, int(available_w * 0.28)))
+        center_w = available_w - left_w - right_w
+        if center_w < 280:
+            shortage = 280 - center_w
+            shrink_left = min(max(0, left_w - 120), shortage // 2)
+            left_w -= shrink_left
+            shortage -= shrink_left
+            shrink_right = min(max(0, right_w - 180), shortage)
+            right_w -= shrink_right
+            center_w = available_w - left_w - right_w
 
         self.left_panel = pygame.Rect(margin, top, left_w, main_h)
         self.center_panel = pygame.Rect(self.left_panel.right + gap, top, center_w, main_h)

@@ -14,7 +14,7 @@ st.set_page_config(page_title="NeuroGame Leaderboard", layout="wide")
 settings = load_settings()
 
 st.title("NeuroGame Leaderboard")
-st.caption("Рейтинг игроков по точности, уровню и скорости реакции")
+st.caption("Рейтинг игроков")
 
 col1, col2, col3 = st.columns([1, 1, 2])
 with col1:

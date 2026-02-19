@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.config import load_settings
-from app.db import ensure_db, write_batch
+from app.db import ensure_db, read_raw_events, write_batch
 from app.leaderboard import build_leaderboard
 
 REQUIRED_EVENT_FIELDS = ("event_id", "event_type", "event_ts", "user_id", "session_id", "payload")
@@ -68,4 +68,23 @@ def leaderboard(limit: int = 100, min_tasks: int = 30) -> dict[str, Any]:
         "count": len(rows),
         "limit": safe_limit,
         "min_tasks": safe_min_tasks,
+    }
+
+
+@app.get("/v1/export/raw")
+def export_raw_events(api_key: str, limit: int = 1000, offset: int = 0) -> dict[str, Any]:
+    if not api_key or api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="invalid_api_key")
+
+    rows = read_raw_events(
+        db_path=settings.db_path,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "ok": True,
+        "rows": rows,
+        "count": len(rows),
+        "limit": max(1, min(5000, int(limit))),
+        "offset": max(0, int(offset)),
     }

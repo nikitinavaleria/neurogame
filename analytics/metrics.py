@@ -3,6 +3,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+DEFAULT_EVENTS_PATH = "analytics/data/events.jsonl"
+
 
 def load_events(path: str) -> List[dict]:
     p = Path(path)
@@ -153,6 +155,11 @@ def aggregate_by_mode(summaries: Dict[str, dict]) -> Dict[str, dict]:
     return results
 
 
+def build_session_summaries(events: List[dict]) -> Dict[str, dict]:
+    sessions = split_by_session(events)
+    return {sid: summarize_session(evts) for sid, evts in sessions.items()}
+
+
 def print_report(summaries: Dict[str, dict]) -> None:
     if not summaries:
         print("No sessions found.")
@@ -191,9 +198,8 @@ def print_report(summaries: Dict[str, dict]) -> None:
 
 
 def main() -> None:
-    events = load_events("data/events.jsonl")
-    sessions = split_by_session(events)
-    summaries = {sid: summarize_session(evts) for sid, evts in sessions.items()}
+    events = load_events(DEFAULT_EVENTS_PATH)
+    summaries = build_session_summaries(events)
     print_report(summaries)
 
 
