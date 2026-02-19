@@ -80,10 +80,7 @@ class GameApp:
         self.pending_runs_path = app_data_path("pending_runs.json")
         self.telemetry_queue_path = app_data_path("telemetry_queue.jsonl")
         self.telemetry_settings_path = app_data_path("telemetry_settings.json")
-        self.default_telemetry_url = os.getenv(
-            "NEUROGAME_DEFAULT_TELEMETRY_URL",
-            "https://telemetry.neurogame.app/v1/events",
-        ).strip()
+        self.default_telemetry_url = os.getenv("NEUROGAME_DEFAULT_TELEMETRY_URL", "http://45.159.211.104:8000/v1/events",).strip()
         telemetry_url, telemetry_api_key = self._load_telemetry_settings()
         self.telemetry_url_value = telemetry_url
         self.telemetry_api_key_value = telemetry_api_key
@@ -943,7 +940,7 @@ class GameApp:
         return load_telemetry_settings_file(
             settings_path=self.telemetry_settings_path,
             default_url=self.default_telemetry_url,
-            default_key="dev-key-change-me",
+            default_key="admin1234ø",
             env_url=env_url,
             env_key=env_key,
         )
