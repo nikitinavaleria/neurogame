@@ -1,8 +1,8 @@
-# Training Pipeline
+# Training 
 
-Папка `training/` хранит весь pipeline обучения модели.
+Папка для обучения модели
 
-## Где лежат данные для обучения
+## Данные для обучения
 
 - `training/data/events.jsonl`
 - `training/data/adaptations.jsonl`
@@ -10,30 +10,15 @@
 
 Ключевой файл для обучения: `training/data/adaptations.jsonl`.
 
-## Быстрый запуск из PyCharm
+## Запуск 
 
-### Вариант 1: единый pipeline (сервер -> датасет -> обучение)
+### Вариант 1 (сервер -> датасет -> обучение)
 
-Запусти `training/pipeline.py` кнопкой Run.
+`pipeline.py`
 
-Параметры задаются в `RUN_CONFIG` внутри файла:
-- `server`
-- `api_key`
-- `out_dir` (по умолчанию `training/data`)
-- `model_out_path` (по умолчанию `game/assets/models/ppo_agent.pt`)
-- `train_mode`, `epochs`, `batch_size`, `gamma`, `lr`
-- `skip_train` (если нужен только экспорт датасета)
 
-### Вариант 2: только обучение по готовому датасету
+### Вариант 2 (только обучение по готовому датасету)
 
-Запусти `training/train.py` кнопкой Run.
+`train.py`
 
-По умолчанию:
-- данные читаются из `training/data/adaptations.jsonl`
-- веса сохраняются в `game/assets/models/ppo_agent.pt`
 
-## Проверка результата
-
-После обучения обновляются:
-- `game/assets/models/ppo_agent.pt`
-- `game/assets/models/ppo_agent.meta.json`

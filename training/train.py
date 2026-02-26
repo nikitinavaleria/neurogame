@@ -9,6 +9,8 @@ from game.settings import SessionConfig
 from training.dataset import build_transitions, load_adaptations
 from training.model import ActorCritic
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train adaptation model from adaptations.jsonl")
@@ -26,11 +28,7 @@ def _resolve_path(path: str) -> Path:
     p = Path(path)
     if p.is_absolute():
         return p
-    project_root = Path(__file__).resolve().parents[1]
-    candidate = project_root / p
-    if candidate.exists():
-        return candidate
-    return Path.cwd() / p
+    return PROJECT_ROOT / p
 
 
 def main():

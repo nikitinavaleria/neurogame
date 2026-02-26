@@ -14,8 +14,8 @@ from training.bridge_transform import to_jsonl, transform_raw_events
 
 @dataclass(frozen=True)
 class PipelineConfig:
-    server: str = "http://127.0.0.1:8000"
-    api_key: str = "dev-key-change-me"
+    server: str = "http://45.159.211.104:8000"
+    api_key: str = "admin1234ø"
     out_dir: str = "training/data"
     model_out_path: str = SessionConfig().rl_model_path
     page_size: int = 1000
@@ -29,6 +29,7 @@ class PipelineConfig:
 
 
 RUN_CONFIG = PipelineConfig()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _join_base(base: str, path: str) -> str:
@@ -107,6 +108,8 @@ def run_train(
 def main() -> None:
     cfg = RUN_CONFIG
     out_dir = Path(cfg.out_dir)
+    if not out_dir.is_absolute():
+        out_dir = PROJECT_ROOT / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -140,7 +143,7 @@ def main() -> None:
 
     out_model_path = Path(cfg.model_out_path)
     if not out_model_path.is_absolute():
-        out_model_path = Path.cwd() / out_model_path
+        out_model_path = PROJECT_ROOT / out_model_path
     run_train(
         data_path=adaptations_path,
         out_model_path=out_model_path,

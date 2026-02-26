@@ -1,11 +1,12 @@
 {
   "state_dim": 12,
-  "action_dim": 9,
-  "transitions": 83,
-  "epochs": 40,
-  "batch_size": 64,
+  "action_dim": 3,
+  "action_space": "tempo3",
+  "transitions": 23,
+  "epochs": 1,
+  "batch_size": 8,
   "lr": 0.0003,
   "gamma": 0.97,
   "mode_filter": "all",
-  "data_path": "/Users/leranikitina/PycharmProjects/neurogame/data/adaptations.jsonl"
+  "data_path": "/Users/leranikitina/PycharmProjects/neurogame/training/data/adaptations.jsonl"
 }
