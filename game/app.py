@@ -866,9 +866,12 @@ class GameApp:
         title = self.ui.font_tiny.render("Точность по последним сессиям", True, self.ui.theme.text)
         self.screen.blit(title, (graph_rect.x + 10, graph_rect.y + 8))
 
-        sessions = list(self.user_recent_sessions[-9:])
+        sessions = list(self.user_recent_sessions[-8:])
+        run_points = self._current_run_accuracy_points()
+        if run_points:
+            sessions.extend({"accuracy_total": p} for p in run_points[-3:])
         live = self._current_session_stats()
-        if live is not None and live["tasks"] > 0:
+        if live is not None and live["tasks"] > 0 and not run_points:
             sessions.append({"accuracy_total": live["accuracy"]})
         if not sessions:
             empty = self.ui.font_tiny.render("Пока нет данных", True, self.ui.theme.text)
@@ -895,6 +898,19 @@ class GameApp:
             pygame.draw.lines(self.screen, self.ui.theme.accent, False, points, 2)
         for p in points:
             pygame.draw.circle(self.screen, self.ui.theme.accent, p, 3)
+
+    def _current_run_accuracy_points(self) -> List[float]:
+        if not self.results:
+            return []
+        batch_size = max(1, int(self.session.total_tasks))
+        points: List[float] = []
+        for start in range(0, len(self.results), batch_size):
+            chunk = self.results[start : start + batch_size]
+            if not chunk:
+                continue
+            acc = sum(1 for r in chunk if r.correct) / len(chunk)
+            points.append(max(0.0, min(1.0, acc)))
+        return points
 
     def _render_profile_motivation(self, rect: pygame.Rect) -> None:
         phrase = self.current_motivation_phrase
