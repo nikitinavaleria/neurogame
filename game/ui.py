@@ -20,21 +20,27 @@ class GameUI:
         self.screen = screen
         self.w, self.h = screen.get_size()
         self.theme = UiTheme()
-        self.font_big = self._make_font(40, bold=True)
-        self.font_huge = self._make_font(72, bold=True)
-        self.font_mid = self._make_font(28)
-        self.font_small = self._make_font(21)
-        self.font_tiny = self._make_font(17)
+        self.ui_scale = max(0.75, min(1.15, min(self.w / 1600.0, self.h / 900.0)))
+        self.compact = self.w < 1280 or self.h < 760
+        self.font_big = self._make_font(max(30, int(40 * self.ui_scale)), bold=True)
+        self.font_huge = self._make_font(max(48, int(72 * self.ui_scale)), bold=True)
+        self.font_mid = self._make_font(max(22, int(28 * self.ui_scale)))
+        self.font_small = self._make_font(max(16, int(21 * self.ui_scale)))
+        self.font_tiny = self._make_font(max(14, int(17 * self.ui_scale)))
         self.stars = self._build_stars(80)
 
         margin = max(8, min(20, self.w // 70))
         top = max(60, min(84, self.h // 12))
-        gap = max(8, min(20, self.w // 80))
+        gap = max(8, min(18, self.w // 90))
         main_h = max(260, self.h - top - margin)
         available_w = max(320, self.w - (margin * 2) - (gap * 2))
 
-        left_w = max(150, min(250, int(available_w * 0.22)))
-        right_w = max(220, min(330, int(available_w * 0.28)))
+        if self.compact:
+            left_w = max(135, min(220, int(available_w * 0.24)))
+            right_w = max(170, min(260, int(available_w * 0.27)))
+        else:
+            left_w = max(150, min(250, int(available_w * 0.22)))
+            right_w = max(220, min(330, int(available_w * 0.28)))
         center_w = available_w - left_w - right_w
         if center_w < 280:
             shortage = 280 - center_w
@@ -49,7 +55,7 @@ class GameUI:
         self.center_panel = pygame.Rect(self.left_panel.right + gap, top, center_w, main_h)
         self.right_panel = pygame.Rect(self.center_panel.right + gap, top, right_w, main_h)
 
-        left_gap = 12
+        left_gap = 10 if self.compact else 12
         usable_h = self.left_panel.height - left_gap * 2
         focus_h = int(usable_h * 0.33)
         help_h = int(usable_h * 0.20)
@@ -73,12 +79,14 @@ class GameUI:
             help_h,
         )
 
-        self.task_panel_height = (self.right_panel.height - 20 * 2) // 3
+        panel_pad = 8 if self.compact else 10
+        task_gap = 8 if self.compact else 10
+        self.task_panel_height = (self.right_panel.height - panel_pad * 2 - task_gap * 2) // 3
         self.task_panels = [
             pygame.Rect(
-                self.right_panel.x + 10,
-                self.right_panel.y + 10 + i * (self.task_panel_height + 10),
-                self.right_panel.width - 20,
+                self.right_panel.x + panel_pad,
+                self.right_panel.y + panel_pad + i * (self.task_panel_height + task_gap),
+                self.right_panel.width - panel_pad * 2,
                 self.task_panel_height,
             )
             for i in range(3)
@@ -232,17 +240,45 @@ class GameUI:
         pygame.draw.rect(self.screen, self.theme.panel, rect, border_radius=10)
         pygame.draw.rect(self.screen, self.theme.border, rect, width=2, border_radius=10)
         color = self.theme.accent if active else self.theme.text
-        label = self.font_small.render(title, True, color)
-        self.screen.blit(label, (rect.x + 14, rect.y + 10))
+        self._draw_fitted_text(
+            text=title,
+            rect=pygame.Rect(rect.x + 10, rect.y + 6, rect.width - 20, self.font_small.get_height() + 6),
+            color=color,
+            align="left",
+        )
 
     def draw_button(self, rect: pygame.Rect, label: str, active: bool = False) -> None:
         fill = (26, 34, 52) if not active else (22, 52, 66)
         border = self.theme.accent if active else self.theme.border
         pygame.draw.rect(self.screen, fill, rect, border_radius=10)
         pygame.draw.rect(self.screen, border, rect, width=2, border_radius=10)
-        text = self.font_small.render(label, True, self.theme.text)
-        text_rect = text.get_rect(center=rect.center)
-        self.screen.blit(text, text_rect)
+        self._draw_fitted_text(text=label, rect=rect, color=self.theme.text, align="center")
+
+    def _draw_fitted_text(
+        self,
+        text: str,
+        rect: pygame.Rect,
+        color: Tuple[int, int, int],
+        align: str = "center",
+    ) -> None:
+        fonts = [self.font_small, self.font_tiny]
+        surf = None
+        for font in fonts:
+            if font.size(text)[0] <= rect.width - 12:
+                surf = font.render(text, True, color)
+                break
+        if surf is None:
+            fallback_size = max(12, int(self.font_tiny.get_height() * 0.85))
+            fallback = self._make_font(fallback_size)
+            clipped = text
+            while len(clipped) > 3 and fallback.size(clipped + "...")[0] > rect.width - 12:
+                clipped = clipped[:-1]
+            surf = fallback.render((clipped + "...") if clipped != text else text, True, color)
+        if align == "left":
+            text_rect = surf.get_rect(midleft=(rect.x + 6, rect.centery))
+        else:
+            text_rect = surf.get_rect(center=rect.center)
+        self.screen.blit(surf, text_rect)
 
     def _make_font(self, size: int, bold: bool = False) -> pygame.font.Font:
         candidates = [

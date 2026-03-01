@@ -45,7 +45,6 @@ class RadarScanTask(TaskBase):
         x = ctx.rect.x + 16
         y = ctx.rect.y + 30
         bottom_y = ctx.rect.bottom - 24
-
         title = ctx.font_mid.render("Есть метка угрозы?", True, ctx.color_main)
         sub = ctx.font_small.render(f"Ищи символ: {self.target_symbol}", True, ctx.color_main)
         value = ctx.font_big.render(self.signal, True, ctx.color_accent)

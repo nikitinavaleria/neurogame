@@ -4,6 +4,7 @@ import random
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Dict, List
 
@@ -80,6 +81,7 @@ class GameApp:
         self.pending_runs_path = app_data_path("pending_runs.json")
         self.telemetry_queue_path = app_data_path("telemetry_queue.jsonl")
         self.telemetry_settings_path = app_data_path("telemetry_settings.json")
+        self.error_log_path = app_data_path("client_errors.log")
         self.default_telemetry_url = os.getenv("NEUROGAME_DEFAULT_TELEMETRY_URL", "http://45.159.211.104:8000/v1/events",).strip()
         telemetry_url, telemetry_api_key = self._load_telemetry_settings()
         self.telemetry_url_value = telemetry_url
@@ -190,15 +192,16 @@ class GameApp:
         info = pygame.display.Info()
         display_w = int(getattr(info, "current_w", target_w) or target_w)
         display_h = int(getattr(info, "current_h", target_h) or target_h)
-        max_w = max(900, int(display_w * 0.96))
-        max_h = max(600, int(display_h * 0.92))
-        width = max(900, min(int(target_w), max_w))
-        height = max(600, min(int(target_h), max_h))
+        min_w, min_h = 760, 520
+        max_w = max(min_w, int(display_w * 0.96))
+        max_h = max(min_h, int(display_h * 0.92))
+        width = max(min_w, min(int(target_w), max_w))
+        height = max(min_h, min(int(target_h), max_h))
         return width, height
 
     def _apply_window_resize(self, width: int, height: int) -> None:
-        new_w = max(900, int(width))
-        new_h = max(600, int(height))
+        new_w = max(760, int(width))
+        new_h = max(520, int(height))
         self.screen = pygame.display.set_mode((new_w, new_h), self.display_flags, vsync=1)
         self.ui = GameUI(self.screen)
 
@@ -480,7 +483,10 @@ class GameApp:
                     color_accent=self.ui.theme.accent,
                     color_alert=self.ui.theme.alert,
                 )
-                focused.render(self.screen, ctx)
+                try:
+                    focused.render(self.screen, ctx)
+                except Exception as exc:  # noqa: BLE001
+                    self._handle_runtime_error("task_render", exc)
             else:
                 self._dim_panel(rect)
             self._render_panel_feedback(rect, idx)
@@ -755,9 +761,12 @@ class GameApp:
         title = self.ui.font_tiny.render("Телеметрия: адрес отправки данных", True, self.ui.theme.accent)
         self.screen.blit(title, (panel.x + 14, start_y))
 
-        buttons_w = 210
+        check_w = max(90, self.ui.font_tiny.size("Проверить")[0] + 26)
+        save_w = max(82, self.ui.font_tiny.size("Сохранить")[0] + 24)
+        buttons_w = check_w + save_w + 18
         row_y = start_y + title_h + 8
-        self.telemetry_url_rect = pygame.Rect(panel.x + 14, row_y, panel.width - buttons_w - 38, row_h)
+        url_w = max(180, panel.width - buttons_w - 38)
+        self.telemetry_url_rect = pygame.Rect(panel.x + 14, row_y, url_w, row_h)
         pygame.draw.rect(self.screen, (9, 12, 22), self.telemetry_url_rect, border_radius=8)
         border = self.ui.theme.accent if self.telemetry_input_focused else self.ui.theme.border
         pygame.draw.rect(self.screen, border, self.telemetry_url_rect, width=2, border_radius=8)
@@ -770,9 +779,9 @@ class GameApp:
         url_surface = self.ui.font_tiny.render(visible_url, True, url_color)
         self.screen.blit(url_surface, (self.telemetry_url_rect.x + 8, self.telemetry_url_rect.y + 5))
 
-        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, row_y + 1, 98, 28)
+        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, row_y + 1, check_w, 28)
         self._draw_compact_button(self.telemetry_check_rect, "Проверить", active=False)
-        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, row_y + 1, 90, 28)
+        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, row_y + 1, save_w, 28)
         self._draw_compact_button(self.telemetry_save_rect, "Сохранить", active=True)
 
         line_y = row_y + row_h + 10
@@ -920,9 +929,31 @@ class GameApp:
         border = self.ui.theme.accent if active else self.ui.theme.border
         pygame.draw.rect(self.screen, fill, rect, border_radius=8)
         pygame.draw.rect(self.screen, border, rect, width=2, border_radius=8)
-        text = self.ui.font_tiny.render(label, True, self.ui.theme.text)
+        font = self.ui.font_tiny
+        if font.size(label)[0] > rect.width - 10:
+            fallback = self.ui._make_font(max(12, int(self.ui.font_tiny.get_height() * 0.85)))
+            clipped = label
+            while len(clipped) > 3 and fallback.size(clipped + "...")[0] > rect.width - 10:
+                clipped = clipped[:-1]
+            text = fallback.render((clipped + "...") if clipped != label else label, True, self.ui.theme.text)
+        else:
+            text = font.render(label, True, self.ui.theme.text)
         text_rect = text.get_rect(center=rect.center)
         self.screen.blit(text, text_rect)
+
+    def _handle_runtime_error(self, stage: str, exc: Exception) -> None:
+        self.last_feedback_text = "Ошибка рендера. Проверь лог client_errors.log"
+        self.last_feedback_ok = False
+        self.last_feedback_ms = pygame.time.get_ticks()
+        self.last_feedback_duration_ms = 4000
+        self.started = False
+        self.pause_menu_open = False
+        payload = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        try:
+            with self.error_log_path.open("a", encoding="utf-8") as f:
+                f.write(f"\n[{int(time.time())}] stage={stage}\n{payload}\n")
+        except OSError:
+            pass
 
     def _handle_auth_event(self, event: pygame.event.Event) -> None:
         handle_auth_event(self, event)
