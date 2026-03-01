@@ -86,8 +86,6 @@ def main() -> None:
 
     print("[2/4] Building desktop executable...")
     add_data_sep = ";" if sys.platform.startswith("win") else ":"
-    add_data_arg = f"{data_dir}{add_data_sep}data"
-    add_assets_arg = f"{assets_dir}{add_data_sep}game/assets"
     build_cmd = [
         sys.executable,
         "-m",
@@ -97,12 +95,18 @@ def main() -> None:
         "--windowed",
         "--name",
         "NeuroGame",
-        "--add-data",
-        add_data_arg,
-        "--add-data",
-        add_assets_arg,
         str(main_py),
     ]
+    add_data_args: list[str] = []
+    if data_dir.exists():
+        add_data_args.extend(["--add-data", f"{data_dir}{add_data_sep}data"])
+    else:
+        print(f"Warning: optional data directory not found, skipping: {data_dir}")
+    if assets_dir.exists():
+        add_data_args.extend(["--add-data", f"{assets_dir}{add_data_sep}game/assets"])
+    else:
+        raise FileNotFoundError(f"Required assets directory not found: {assets_dir}")
+    build_cmd[-1:-1] = add_data_args
     # macOS dmg works more reliably with native .app (onedir).
     if not sys.platform.startswith("darwin"):
         build_cmd.insert(5, "--onefile")

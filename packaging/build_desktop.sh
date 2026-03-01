@@ -17,15 +17,25 @@ else
   ADD_DATA_SEP=":"
 fi
 ASSETS_DIR="$ROOT_DIR/game/assets"
+ADD_DATA_ARGS=()
+if [[ -d "$ROOT_DIR/data" ]]; then
+  ADD_DATA_ARGS+=(--add-data "$ROOT_DIR/data${ADD_DATA_SEP}data")
+else
+  echo "Warning: optional data directory not found, skipping: $ROOT_DIR/data"
+fi
+if [[ -d "$ASSETS_DIR" ]]; then
+  ADD_DATA_ARGS+=(--add-data "$ASSETS_DIR${ADD_DATA_SEP}game/assets")
+else
+  echo "Required assets directory not found: $ASSETS_DIR"
+  exit 1
+fi
 if [[ "$OSTYPE" == "darwin"* ]]; then
   python -m PyInstaller --noconfirm --clean --windowed --name NeuroGame \
-    --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
-    --add-data "$ASSETS_DIR${ADD_DATA_SEP}game/assets" \
+    "${ADD_DATA_ARGS[@]}" \
     "$ROOT_DIR/main.py"
 else
   python -m PyInstaller --noconfirm --clean --onefile --windowed --name NeuroGame \
-    --add-data "$ROOT_DIR/data${ADD_DATA_SEP}data" \
-    --add-data "$ASSETS_DIR${ADD_DATA_SEP}game/assets" \
+    "${ADD_DATA_ARGS[@]}" \
     "$ROOT_DIR/main.py"
 fi
 
