@@ -82,7 +82,10 @@ class GameApp:
         self.telemetry_queue_path = app_data_path("telemetry_queue.jsonl")
         self.telemetry_settings_path = app_data_path("telemetry_settings.json")
         self.error_log_path = app_data_path("client_errors.log")
-        self.default_telemetry_url = os.getenv("NEUROGAME_DEFAULT_TELEMETRY_URL", "http://45.159.211.104:8000/v1/events",).strip()
+        self.default_telemetry_url = os.getenv(
+            "NEUROGAME_DEFAULT_TELEMETRY_URL",
+            os.getenv("NEUROGAME_TELEMETRY_URL", "http://127.0.0.1:8000/v1/events"),
+        ).strip()
         telemetry_url, telemetry_api_key = self._load_telemetry_settings()
         self.telemetry_url_value = telemetry_url
         self.telemetry_api_key_value = telemetry_api_key

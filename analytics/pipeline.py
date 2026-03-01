@@ -15,7 +15,7 @@ from analytics.raw_transform import to_jsonl, transform_raw_events
 @dataclass(frozen=True)
 class AnalyticsConfig:
     fetch_from_backend: bool = True
-    server: str = "http://127.0.0.1:8000"
+    server: str = os.getenv("NEUROGAME_BACKEND_URL", "http://127.0.0.1:8000").strip()
     api_key: str = os.getenv("NEUROGAME_API_KEY", "").strip()
     page_size: int = 1000
     max_pages: int = 10000
