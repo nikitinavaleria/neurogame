@@ -46,7 +46,10 @@ class SequenceMemoryTask(TaskBase):
             seq = " ".join(self.sequence)
             surf = ctx.font_big.render(seq, True, ctx.color_main)
             screen.blit(surf, (x, y + min(64, max_h // 3)))
-            hint = ctx.font_small.render("Запомни последовательность", True, ctx.color_main)
+            hint_text = "Запомни последовательность"
+            if ctx.font_small.size(hint_text)[0] > ctx.rect.width - 32:
+                hint_text = "Запомни символы"
+            hint = ctx.font_small.render(hint_text, True, ctx.color_main)
             screen.blit(hint, (x, y + max_h - 22))
             return
 

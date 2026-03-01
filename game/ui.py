@@ -221,12 +221,12 @@ class GameUI:
             self.theme.text,
         )
         self.screen.blit(progress_line, (x, rect.bottom - 28))
-        planets_line = self.font_tiny.render(
+        planets_line = self.font_small.render(
             f"Посещено планет: {planets_visited}",
             True,
             self.theme.text,
         )
-        self.screen.blit(planets_line, (x, rect.bottom - 48))
+        self.screen.blit(planets_line, (x, rect.bottom - 54))
 
     def draw_task_panel(self, rect: pygame.Rect, title: str, active: bool) -> None:
         pygame.draw.rect(self.screen, self.theme.panel, rect, border_radius=10)

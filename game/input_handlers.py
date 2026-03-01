@@ -11,7 +11,7 @@ def handle_auth_event(app, event: pygame.event.Event) -> None:
         return
     if event.key in (pygame.K_F2, pygame.K_m):
         app.auth_mode = "register" if app.auth_mode == "login" else "login"
-        app.auth_message = "Режим: регистрация" if app.auth_mode == "register" else "Режим: вход"
+        app.auth_message = ""
         return
     if event.key == pygame.K_RETURN:
         app._submit_auth()
@@ -44,7 +44,7 @@ def handle_auth_mouse(app, pos: tuple[int, int]) -> None:
         return
     if app.auth_toggle_rect and app.auth_toggle_rect.collidepoint(pos):
         app.auth_mode = "register" if app.auth_mode == "login" else "login"
-        app.auth_message = "Режим: регистрация" if app.auth_mode == "register" else "Режим: вход"
+        app.auth_message = ""
         return
     if app.auth_submit_rect and app.auth_submit_rect.collidepoint(pos):
         app._submit_auth()
@@ -61,6 +61,12 @@ def handle_menu_mouse(app, pos: tuple[int, int]) -> None:
         return
     if app.telemetry_save_rect and app.telemetry_save_rect.collidepoint(pos):
         app._save_telemetry_url()
+        return
+    if app.logout_button_rect and app.logout_button_rect.collidepoint(pos):
+        app._logout_user()
+        return
+    if app.exit_button_rect and app.exit_button_rect.collidepoint(pos):
+        app._exit_app()
         return
     if app.resume_button_rect and app.resume_button_rect.collidepoint(pos):
         if not app.awaiting_run_setup:
@@ -92,12 +98,6 @@ def handle_menu_mouse(app, pos: tuple[int, int]) -> None:
         return
     if app.level_transition_toggle_rect and app.level_transition_toggle_rect.collidepoint(pos):
         app.pause_between_levels = not app.pause_between_levels
-        return
-    if app.logout_button_rect and app.logout_button_rect.collidepoint(pos):
-        app._logout_user()
-        return
-    if app.exit_button_rect and app.exit_button_rect.collidepoint(pos):
-        app._exit_app()
         return
 
 

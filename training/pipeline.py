@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from training.bridge_transform import to_jsonl, transform_raw_events
 @dataclass(frozen=True)
 class PipelineConfig:
     server: str = "http://45.159.211.104:8000"
-    api_key: str = "admin1234ø"
+    api_key: str = os.getenv("NEUROGAME_API_KEY", "").strip()
     out_dir: str = "training/data"
     model_out_path: str = SessionConfig().rl_model_path
     page_size: int = 1000

@@ -122,7 +122,7 @@ class GameApp:
         self.last_feedback_slot_index: int | None = None
         self.active_slot_index: int | None = None
         self.last_focused_token: int | None = None
-        self.slot_rng = random.Random(12345)
+        self.slot_rng = random.Random()
         self.batch_result_start: int = 0
         self.batch_index: int = 1
         self.planets_visited: int = 0
@@ -138,18 +138,26 @@ class GameApp:
         self.user_progress: Dict[str, float] = self._empty_progress()
         self.user_recent_sessions: List[dict] = []
         self.motivation_phrases: List[str] = [
-            "Хороший ритм. Сохраняй точность.",
-            "Каждая сессия усиливает концентрацию.",
-            "Стабильность важнее спешки.",
-            "Маленький прогресс каждый полет.",
-            "Держи темп, но не теряй фокус.",
-            "Точность сегодня строит результат завтра.",
-            "Спокойно и четко: это твоя сильная сторона.",
-            "Один уровень за раз - и маршрут пройден.",
-            "Лучше ровно, чем резко.",
-            "Ты уже держишь систему под контролем.",
-            "Фокус и ритм: сильная связка.",
-            "Каждый правильный ответ двигает тебя вперед.",
+            "Молчи громче, чем другие кричат - результат всё объяснит.",
+            "Сначала работа над собой, потом - разговоры о судьбе.",
+            "Хочешь уважения? Сделай так, чтобы без тебя было хуже.",
+            "Страх - это сигнал. Слабость - это выбор.",
+            "Не трать время на оправдания - трать его на прогресс.",
+            "Чем тише шаги, тем громче финиш.",
+            "Либо ты управляешь днём, либо день управляет тобой.",
+            "Упорство бьёт талант, если талант ленится.",
+            "Не обещай - докажи.",
+            "Пока другие ищут причины, ты ищи способы.",
+            "Дисциплина сегодня - свобода завтра.",
+            "Сильный не тот, кто не падает, а тот, кто поднимается быстрее.",
+            "Делай так, чтобы сомневающиеся запоминали твоё имя.",
+            "Устал - не значит проиграл. Это значит, что идёшь дальше остальных.",
+            "Настоящий риск - прожить жизнь вполсилы.",
+            "Если цель пугает - значит, она стоит того.",
+            "Не соревнуйся с людьми - соревнуйся со вчерашним собой.",
+            "Спокойствие - оружие тех, кто уверен в ударе.",
+            "Дорога тяжёлая? Значит, ты идёшь вверх.",
+            "Твоё будущее начинается с решений, которые ты принимаешь сегодня.",
         ]
         self.current_motivation_phrase: str = self.motivation_phrases[0]
         self._roll_motivation_phrase()
@@ -175,6 +183,7 @@ class GameApp:
         self.pause_menu_open: bool = False
         self.persist_active_run_on_exit: bool = False
         self.partial_session_end_emitted: bool = False
+        self.saved_run_preview_stats: Dict[str, float] | None = None
 
     @staticmethod
     def _pick_initial_window_size(target_w: int, target_h: int) -> tuple[int, int]:
@@ -530,7 +539,7 @@ class GameApp:
         self.ui.draw_button(self.menu_button_rect, "В главное меню", active=False)
         self.ui.draw_button(self.restart_button_rect, "Начать заново", active=False)
         self.ui.draw_button(self.logout_button_rect, "Сменить пользователя", active=False)
-        self.ui.draw_button(self.exit_button_rect, "Выход", active=False)
+        self.ui.draw_button(self.exit_button_rect, "Выход из приложения", active=False)
         hint = self.ui.font_tiny.render("Esc - продолжить", True, self.ui.theme.text)
         self.screen.blit(hint, (card.x + 20, card.bottom - 30))
 
@@ -595,21 +604,25 @@ class GameApp:
 
         margin = 20
         col_gap = 20
-        row_gap = 14
+        row_gap = 12
         main_top = 84
-        main_bottom = self.ui.h - 20
+        main_bottom = self.ui.h - 24
         main_height = max(240, main_bottom - main_top)
 
         left_w = self.ui.left_panel.width
         right_w = self.ui.right_panel.width
         center_w = self.ui.w - margin * 2 - col_gap * 2 - left_w - right_w
-        top_row_h = int(main_height * 0.48)
+        top_row_h = int(main_height * 0.38)
+        top_row_h = max(220, min(top_row_h, 300))
         bottom_row_h = main_height - top_row_h - row_gap
+        telemetry_h = max(110, min(170, int(main_height * 0.24)))
+        profile_h = max(120, bottom_row_h - telemetry_h - row_gap)
 
         left_box = pygame.Rect(margin, main_top, left_w, top_row_h)
         center_box = pygame.Rect(left_box.right + col_gap, main_top, center_w, top_row_h)
         right_top_box = pygame.Rect(center_box.right + col_gap, main_top, right_w, top_row_h)
-        profile_box = pygame.Rect(margin, main_top + top_row_h + row_gap, self.ui.w - margin * 2, bottom_row_h)
+        profile_box = pygame.Rect(margin, main_top + top_row_h + row_gap, self.ui.w - margin * 2, profile_h)
+        telemetry_top = profile_box.bottom + row_gap
 
         for rect in [center_box, left_box, right_top_box, profile_box]:
             pygame.draw.rect(self.screen, self.ui.theme.panel, rect, border_radius=12)
@@ -618,45 +631,48 @@ class GameApp:
         intro_lines = [
             "Ты - оператор космической станции.",
             "Поддерживай стабильность и отвечай точно.",
-            "Проходи задания и облетай планеты одну за другой.",
-            "Каждый завершенный полет открывает новую зону маршрута.",
+            "Проходи задания и облетай планеты.",
         ]
-        yy = center_box.y + 56
+        yy = center_box.y + 48
         for line in intro_lines:
             surf = self.ui.font_small.render(line, True, self.ui.theme.text)
             self.screen.blit(surf, (center_box.x + 20, yy))
-            yy += 28
-        controls_y = yy + 10
+            yy += 24
+
+        controls_y = max(yy + 8, center_box.bottom - 96)
+        action_gap = 10
+        action_w = (center_box.width - 20 * 2 - action_gap) // 2
+        right_x = center_box.x + 20 + action_w + action_gap
+        bottom_row_y = controls_y + 44
+
         if self.awaiting_run_setup:
             if self._has_saved_run_for_user():
-                self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, 280, 36)
+                self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, action_w, 36)
                 self.ui.draw_button(self.resume_button_rect, "Продолжить сессию", active=True)
-                self.restart_button_rect = pygame.Rect(center_box.x + 312, controls_y, 190, 36)
-                self.ui.draw_button(self.restart_button_rect, "Начать с 1", active=False)
+                self.restart_button_rect = pygame.Rect(right_x, controls_y, action_w, 36)
+                self.ui.draw_button(self.restart_button_rect, "Начать с 1 уровня", active=False)
             else:
                 has_history = self.user_progress.get("sessions", 0) > 0
                 if has_history:
                     level = int(self.user_progress.get("last_level", 1))
-                    self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, 280, 36)
+                    self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, action_w, 36)
                     self.ui.draw_button(self.resume_button_rect, f"Продолжить с ур. {level}", active=True)
-                    self.restart_button_rect = pygame.Rect(center_box.x + 312, controls_y, 190, 36)
-                    self.ui.draw_button(self.restart_button_rect, "Начать с 1", active=False)
+                    self.restart_button_rect = pygame.Rect(right_x, controls_y, action_w, 36)
+                    self.ui.draw_button(self.restart_button_rect, "Начать с 1 уровня", active=False)
                 else:
-                    self.start_button_rect = pygame.Rect(center_box.x + 20, controls_y, 220, 36)
+                    self.start_button_rect = pygame.Rect(center_box.x + 20, controls_y, action_w, 36)
                     self.ui.draw_button(self.start_button_rect, "Старт", active=True)
+                    self.restart_button_rect = pygame.Rect(right_x, controls_y, action_w, 36)
+                    self.ui.draw_button(self.restart_button_rect, "Начать с 1 уровня", active=False)
         else:
-            self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, 280, 36)
-            self.ui.draw_button(self.resume_button_rect, "Продолжить текущий", active=True)
-            self.restart_button_rect = pygame.Rect(center_box.x + 312, controls_y, 190, 36)
-            self.ui.draw_button(self.restart_button_rect, "Начать с 1", active=False)
-        self.logout_button_rect = pygame.Rect(center_box.right - 430, controls_y, 200, 36)
+            self.resume_button_rect = pygame.Rect(center_box.x + 20, controls_y, action_w, 36)
+            self.ui.draw_button(self.resume_button_rect, "Продолжить сессию", active=True)
+            self.restart_button_rect = pygame.Rect(right_x, controls_y, action_w, 36)
+            self.ui.draw_button(self.restart_button_rect, "Начать с 1 уровня", active=False)
+        self.logout_button_rect = pygame.Rect(center_box.x + 20, bottom_row_y, action_w, 36)
         self.ui.draw_button(self.logout_button_rect, "Сменить пользователя", active=False)
-        self.exit_button_rect = pygame.Rect(center_box.right - 218, controls_y, 198, 36)
-        self.ui.draw_button(self.exit_button_rect, "Выход", active=False)
-
-        if self.last_feedback_text:
-            cont = self.ui.font_small.render(self.last_feedback_text, True, self.ui.theme.accent)
-            self.screen.blit(cont, (center_box.x + 20, controls_y + 46))
+        self.exit_button_rect = pygame.Rect(right_x, bottom_row_y, action_w, 36)
+        self.ui.draw_button(self.exit_button_rect, "Выход из приложения", active=False)
 
         mode_title = self.ui.font_small.render("Текущий режим адаптации:", True, self.ui.theme.accent)
         self.screen.blit(mode_title, (right_top_box.x + 16, right_top_box.y + 16))
@@ -701,35 +717,70 @@ class GameApp:
                 self.ui.theme.text,
                 line_h=21,
             )
-        self._render_telemetry_panel()
+        self._render_telemetry_panel(telemetry_top, telemetry_h)
 
-    def _render_telemetry_panel(self) -> None:
-        panel_h = 64
-        panel = pygame.Rect(20, self.ui.h - panel_h - 8, self.ui.w - 40, panel_h)
+    def _render_telemetry_panel(self, top_y: int, preferred_h: int) -> None:
+        safe_top = min(top_y, self.ui.h - 100)
+        panel_h = max(88, min(preferred_h, self.ui.h - safe_top - 12))
+        panel = pygame.Rect(20, safe_top, self.ui.w - 40, panel_h)
         pygame.draw.rect(self.screen, (15, 20, 34), panel, border_radius=10)
         pygame.draw.rect(self.screen, self.ui.theme.border, panel, width=2, border_radius=10)
 
-        title = self.ui.font_tiny.render("Телеметрия: адрес отправки данных", True, self.ui.theme.accent)
-        self.screen.blit(title, (panel.x + 14, panel.y + 7))
+        status_text, ok = self._telemetry_status_text()
+        status_color = self.ui.theme.accent if ok else self.ui.theme.alert
+        words = status_text.split()
+        lines: List[str] = []
+        current = ""
+        max_width = panel.width - 28
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if self.ui.font_tiny.size(candidate)[0] <= max_width:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            lines = [status_text]
 
-        self.telemetry_url_rect = pygame.Rect(panel.x + 14, panel.y + 28, panel.width - 300, 28)
+        title_h = self.ui.font_tiny.get_height()
+        row_h = 30
+        line_h = 18
+        status_h = max(line_h, len(lines) * line_h)
+        content_h = title_h + 8 + row_h + 10 + status_h
+        start_y = panel.y + max(8, (panel.height - content_h) // 2)
+
+        title = self.ui.font_tiny.render("Телеметрия: адрес отправки данных", True, self.ui.theme.accent)
+        self.screen.blit(title, (panel.x + 14, start_y))
+
+        buttons_w = 210
+        row_y = start_y + title_h + 8
+        self.telemetry_url_rect = pygame.Rect(panel.x + 14, row_y, panel.width - buttons_w - 38, row_h)
         pygame.draw.rect(self.screen, (9, 12, 22), self.telemetry_url_rect, border_radius=8)
         border = self.ui.theme.accent if self.telemetry_input_focused else self.ui.theme.border
         pygame.draw.rect(self.screen, border, self.telemetry_url_rect, width=2, border_radius=8)
         url_text = self.telemetry_url_value or "https://..."
         url_color = self.ui.theme.text if self.telemetry_url_value else (140, 150, 175)
-        url_surface = self.ui.font_tiny.render(url_text, True, url_color)
+        visible_url = url_text
+        max_url_w = self.telemetry_url_rect.width - 16
+        while self.ui.font_tiny.size(visible_url)[0] > max_url_w and len(visible_url) > 4:
+            visible_url = "..." + visible_url[4:]
+        url_surface = self.ui.font_tiny.render(visible_url, True, url_color)
         self.screen.blit(url_surface, (self.telemetry_url_rect.x + 8, self.telemetry_url_rect.y + 5))
 
-        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, panel.y + 28, 110, 28)
+        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, row_y + 1, 98, 28)
         self._draw_compact_button(self.telemetry_check_rect, "Проверить", active=False)
-        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, panel.y + 28, 90, 28)
+        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, row_y + 1, 90, 28)
         self._draw_compact_button(self.telemetry_save_rect, "Сохранить", active=True)
 
-        status_text, ok = self._telemetry_status_text()
-        status_color = self.ui.theme.accent if ok else self.ui.theme.alert
-        status_surface = self.ui.font_tiny.render(status_text, True, status_color)
-        self.screen.blit(status_surface, (panel.x + 14, panel.y + 46))
+        line_y = row_y + row_h + 10
+        for line in lines:
+            surf = self.ui.font_tiny.render(line, True, status_color)
+            line_rect = surf.get_rect(center=(panel.centerx, line_y + surf.get_height() // 2))
+            self.screen.blit(surf, line_rect)
+            line_y += line_h
 
     def _render_auth_panel(self, rect: pygame.Rect) -> None:
         x = rect.x + 20
@@ -765,59 +816,32 @@ class GameApp:
 
     def _render_user_progress(self, rect: pygame.Rect) -> None:
         x = rect.x + 16
-        y = rect.y + 48
-        user_line = self.ui.font_mid.render(f"Пилот: {self.user_id}", True, self.ui.theme.text)
-        self.screen.blit(user_line, (x, y))
+        y = rect.y + 56
         live = self._current_session_stats()
         saved_sessions = int(self.user_progress["sessions"])
         saved_avg_acc = float(self.user_progress["avg_accuracy"])
         saved_avg_rt = float(self.user_progress["avg_rt"])
-        saved_best = float(self.user_progress["best_accuracy"])
-        saved_last = float(self.user_progress["last_accuracy"])
-        saved_level = int(self.user_progress["last_level"])
 
         # Показываем "общую" статистику с учетом текущей сессии, чтобы цифры были актуальны сразу.
         if live is not None and live["tasks"] > 0:
-            combined_sessions = saved_sessions + 1
-            combined_avg_acc = ((saved_avg_acc * saved_sessions) + live["accuracy"]) / max(1, combined_sessions)
-            combined_avg_rt = ((saved_avg_rt * saved_sessions) + live["mean_rt"]) / max(1, combined_sessions)
-            combined_best = max(saved_best, live["accuracy"])
-            combined_last = live["accuracy"]
-            combined_level = self.current_level
+            combined_total_sessions = saved_sessions + 1
+            combined_avg_acc = ((saved_avg_acc * saved_sessions) + live["accuracy"]) / max(1, combined_total_sessions)
+            combined_avg_rt = ((saved_avg_rt * saved_sessions) + live["mean_rt"]) / max(1, combined_total_sessions)
         else:
-            combined_sessions = saved_sessions
             combined_avg_acc = saved_avg_acc
             combined_avg_rt = saved_avg_rt
-            combined_best = saved_best
-            combined_last = saved_last
-            combined_level = saved_level
 
         lines = [
-            f"Сессий: {combined_sessions}",
+            f"Пилот: {self.user_id}",
             f"Планет всего: {int(self._total_planets_overall())}",
-            f"Средн. точность: {int(combined_avg_acc * 100)}%",
-            f"Лучшая точность: {int(combined_best * 100)}%",
-            f"Среднее RT: {int(combined_avg_rt)} мс",
-            f"Последняя точность: {int(combined_last * 100)}%",
-            f"Последний уровень: {combined_level}",
+            f"Средняя точность: {int(combined_avg_acc * 100)}%",
+            f"Среднее время ответа: {int(combined_avg_rt)} мс",
         ]
-        yy = y + 30
+        yy = y
         for line in lines:
             surf = self.ui.font_small.render(line, True, self.ui.theme.text)
             self.screen.blit(surf, (x, yy))
             yy += 24
-
-        if live is not None:
-            live_lines = [
-                f"Текущая сессия: {int(live['tasks'])} задач",
-                f"Точность сейчас: {int(live['accuracy'] * 100)}%",
-                f"RT сейчас: {int(live['mean_rt'])} мс",
-            ]
-            yy += 8
-            for line in live_lines:
-                surf = self.ui.font_tiny.render(line, True, self.ui.theme.accent)
-                self.screen.blit(surf, (x, yy))
-                yy += 20
 
     def _render_profile_graph(self, rect: pygame.Rect) -> None:
         stats_w = 420
@@ -830,7 +854,10 @@ class GameApp:
         title = self.ui.font_tiny.render("Точность по последним сессиям", True, self.ui.theme.text)
         self.screen.blit(title, (graph_rect.x + 10, graph_rect.y + 8))
 
-        sessions = self.user_recent_sessions[-10:]
+        sessions = list(self.user_recent_sessions[-9:])
+        live = self._current_session_stats()
+        if live is not None and live["tasks"] > 0:
+            sessions.append({"accuracy_total": live["accuracy"]})
         if not sessions:
             empty = self.ui.font_tiny.render("Пока нет данных", True, self.ui.theme.text)
             self.screen.blit(empty, (graph_rect.x + 10, graph_rect.centery))
@@ -928,6 +955,7 @@ class GameApp:
         self.auth_password = ""
         self.user_progress = self._load_user_progress(self.user_id)
         self.user_recent_sessions = self._load_recent_sessions(self.user_id)
+        self.saved_run_preview_stats = self._load_saved_run_preview_stats()
         self.awaiting_run_setup = True
         self.pause_menu_open = False
         if self._has_saved_run_for_user():
@@ -937,10 +965,12 @@ class GameApp:
     def _load_telemetry_settings(self) -> tuple[str, str]:
         env_url = os.getenv("NEUROGAME_TELEMETRY_URL", "").strip()
         env_key = os.getenv("NEUROGAME_TELEMETRY_API_KEY", "").strip()
+        if not env_key:
+            env_key = os.getenv("NEUROGAME_API_KEY", "").strip()
         return load_telemetry_settings_file(
             settings_path=self.telemetry_settings_path,
             default_url=self.default_telemetry_url,
-            default_key="admin1234ø",
+            default_key=env_key,
             env_url=env_url,
             env_key=env_key,
         )
@@ -1093,6 +1123,7 @@ class GameApp:
         runs = self._load_pending_runs()
         runs[self.user_id] = snapshot
         self._save_pending_runs(runs)
+        self.saved_run_preview_stats = self._summarize_task_results(self.results)
 
     def _clear_saved_run(self) -> None:
         if not self.user_id:
@@ -1102,6 +1133,7 @@ class GameApp:
             return
         runs.pop(self.user_id, None)
         self._save_pending_runs(runs)
+        self.saved_run_preview_stats = None
 
     def _restore_saved_run(self) -> bool:
         if not self.user_id:
@@ -1142,6 +1174,7 @@ class GameApp:
                 except TypeError:
                     continue
         self.results = restored_results
+        self.saved_run_preview_stats = None
         self.batch_result_start = min(self.batch_result_start, len(self.results))
         answered_in_batch = max(0, int(snapshot.get("batch_tasks_done", len(self.results) - self.batch_result_start)))
         answered_in_batch = min(answered_in_batch, self.session.total_tasks)
@@ -1214,6 +1247,7 @@ class GameApp:
         self.pause_menu_open = False
         self.started = True
         self.partial_session_end_emitted = False
+        self.saved_run_preview_stats = None
         self._clear_saved_run()
         self.telemetry.track(
             event_type="session_start",
@@ -1242,6 +1276,7 @@ class GameApp:
         self.auth_message = ""
         self.user_progress = self._empty_progress()
         self.user_recent_sessions = []
+        self.saved_run_preview_stats = None
         self.awaiting_run_setup = True
         self._roll_motivation_phrase()
 
@@ -1347,13 +1382,39 @@ class GameApp:
         return yy
 
     def _current_session_stats(self) -> Dict[str, float] | None:
-        if not self.results:
+        live = self._summarize_task_results(self.results)
+        if live is not None:
+            return live
+        return self.saved_run_preview_stats
+
+    @staticmethod
+    def _summarize_task_results(results: List[TaskResult]) -> Dict[str, float] | None:
+        if not results:
             return None
-        tasks = len(self.results)
-        accuracy = sum(1 for r in self.results if r.correct) / max(1, tasks)
-        rts = [r.rt_ms for r in self.results if r.rt_ms is not None]
+        tasks = len(results)
+        accuracy = sum(1 for r in results if r.correct) / max(1, tasks)
+        rts = [r.rt_ms for r in results if r.rt_ms is not None]
         mean_rt = (sum(rts) / len(rts)) if rts else 0.0
         return {"tasks": float(tasks), "accuracy": accuracy, "mean_rt": mean_rt}
+
+    def _load_saved_run_preview_stats(self) -> Dict[str, float] | None:
+        if not self.user_id:
+            return None
+        snapshot = self._load_pending_runs().get(self.user_id)
+        if not isinstance(snapshot, dict):
+            return None
+        raw_results = snapshot.get("results", [])
+        if not isinstance(raw_results, list):
+            return None
+        results: List[TaskResult] = []
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            try:
+                results.append(TaskResult(**item))
+            except TypeError:
+                continue
+        return self._summarize_task_results(results)
 
     def _total_planets_overall(self) -> int:
         return int(self.user_progress.get("total_planets", 0.0))
@@ -1401,11 +1462,32 @@ class GameApp:
         if self.last_feedback_text == "Слишком поздно":
             return
         color = self.ui.theme.accent if self.last_feedback_ok else self.ui.theme.alert
-        shadow = self.ui.font_mid.render(self.last_feedback_text, True, (10, 16, 28))
-        text = self.ui.font_mid.render(self.last_feedback_text, True, color)
-        rect = text.get_rect(midbottom=(self.ui.w // 2, self.ui.h - 6))
-        self.screen.blit(shadow, (rect.x + 2, rect.y + 2))
-        self.screen.blit(text, rect)
+        words = self.last_feedback_text.split()
+        lines: List[str] = []
+        current = ""
+        max_width = self.ui.center_panel.width - 40
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if self.ui.font_mid.size(candidate)[0] <= max_width:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            return
+
+        line_h = self.ui.font_mid.get_height() + 4
+        total_h = len(lines) * line_h
+        start_y = self.ui.center_panel.centery - (total_h // 2)
+        for idx, text_line in enumerate(lines):
+            shadow = self.ui.font_mid.render(text_line, True, (10, 16, 28))
+            text = self.ui.font_mid.render(text_line, True, color)
+            rect = text.get_rect(center=(self.ui.center_panel.centerx, start_y + idx * line_h + line_h // 2))
+            self.screen.blit(shadow, (rect.x + 2, rect.y + 2))
+            self.screen.blit(text, rect)
 
     def _finalize_session(self) -> None:
         if self.persist_active_run_on_exit:

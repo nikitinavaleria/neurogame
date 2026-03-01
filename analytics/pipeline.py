@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,7 @@ from analytics.raw_transform import to_jsonl, transform_raw_events
 class AnalyticsConfig:
     fetch_from_backend: bool = True
     server: str = "http://127.0.0.1:8000"
-    api_key: str = "dev-key-change-me"
+    api_key: str = os.getenv("NEUROGAME_API_KEY", "").strip()
     page_size: int = 1000
     max_pages: int = 10000
     dataset_dir: str = "analytics/data"
