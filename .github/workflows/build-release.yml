@@ -14,6 +14,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -47,6 +48,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -55,6 +57,8 @@ jobs:
           python -m pip install pyinstaller
 
       - name: Build executable
+        env:
+          NEUROGAME_PYINSTALLER_MODE: onedir
         run: python packaging/build_desktop.py
 
       - name: Install Inno Setup
@@ -70,7 +74,6 @@ jobs:
         with:
           name: neurogame-windows
           path: |
-            dist/NeuroGame.exe
+            dist/NeuroGame/
             dist/NeuroGameSetup.exe
             dist/neurogame-*.zip
-

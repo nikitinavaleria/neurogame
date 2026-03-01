@@ -5,6 +5,7 @@ import zipfile
 import argparse
 import importlib.util
 import time
+import os
 from pathlib import Path
 
 
@@ -86,6 +87,7 @@ def main() -> None:
 
     print("[2/4] Building desktop executable...")
     add_data_sep = ";" if sys.platform.startswith("win") else ":"
+    mode = os.getenv("NEUROGAME_PYINSTALLER_MODE", "").strip().lower()
     build_cmd = [
         sys.executable,
         "-m",
@@ -108,7 +110,11 @@ def main() -> None:
         raise FileNotFoundError(f"Required assets directory not found: {assets_dir}")
     build_cmd[-1:-1] = add_data_args
     # macOS dmg works more reliably with native .app (onedir).
-    if not sys.platform.startswith("darwin"):
+    if sys.platform.startswith("darwin"):
+        pass
+    elif mode == "onedir":
+        print("Using PyInstaller onedir mode from NEUROGAME_PYINSTALLER_MODE=onedir")
+    else:
         build_cmd.insert(5, "--onefile")
     run(build_cmd, cwd=root)
 

@@ -14,7 +14,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\..\dist\NeuroGame.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\NeuroGame\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\NeuroGame"; Filename: "{app}\NeuroGame.exe"
