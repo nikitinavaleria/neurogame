@@ -23,6 +23,8 @@ jobs:
           python -m pip install pyinstaller
 
       - name: Build executable
+        env:
+          NEUROGAME_PYINSTALLER_MODE: onedir
         run: python packaging/build_desktop.py
 
       - name: Upload Linux artifacts
@@ -30,7 +32,7 @@ jobs:
         with:
           name: neurogame-linux
           path: |
-            dist/NeuroGame
+            dist/NeuroGame/
             dist/neurogame-*.zip
 
   build-macos:

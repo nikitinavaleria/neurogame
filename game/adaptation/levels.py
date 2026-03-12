@@ -1,4 +1,5 @@
 from dataclasses import replace
+from typing import Mapping
 
 from game.settings import DifficultyConfig
 
@@ -89,4 +90,39 @@ def apply_tempo(diff: DifficultyConfig, tempo_offset: int) -> DifficultyConfig:
         switch=replace(diff.switch, time_limit_ms=max(900, int(diff.switch.time_limit_ms * factor))),
         parity=replace(diff.parity, time_limit_ms=max(900, int(diff.parity.time_limit_ms * factor))),
         radar=replace(diff.radar, time_limit_ms=max(900, int(diff.radar.time_limit_ms * factor))),
+    )
+
+
+def apply_task_offsets(diff: DifficultyConfig, offsets: Mapping[str, int]) -> DifficultyConfig:
+    compare_off = int(offsets.get("compare_codes", 0))
+    memory_off = int(offsets.get("sequence_memory", 0))
+    switch_off = int(offsets.get("rule_switch", 0))
+    parity_off = int(offsets.get("parity_check", 0))
+    radar_off = int(offsets.get("radar_scan", 0))
+
+    def _clamp(v: int, lo: int, hi: int) -> int:
+        return max(lo, min(hi, int(v)))
+
+    return DifficultyConfig(
+        global_params=diff.global_params,
+        compare=replace(
+            diff.compare,
+            code_len=_clamp(diff.compare.code_len + compare_off, 3, 8),
+        ),
+        memory=replace(
+            diff.memory,
+            seq_len=_clamp(diff.memory.seq_len + memory_off, 3, 9),
+        ),
+        switch=replace(
+            diff.switch,
+            rule_complexity=_clamp(diff.switch.rule_complexity + switch_off, 1, 8),
+        ),
+        parity=replace(
+            diff.parity,
+            question_complexity=_clamp(diff.parity.question_complexity + parity_off, 1, 8),
+        ),
+        radar=replace(
+            diff.radar,
+            signal_len=_clamp(diff.radar.signal_len + radar_off, 4, 10),
+        ),
     )

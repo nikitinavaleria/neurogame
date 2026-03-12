@@ -8,6 +8,7 @@ from typing import List, Optional
 class Transition:
     state: List[float]
     action: int
+    task_actions: List[int]
     reward: float
     next_state: List[float]
     done: bool
@@ -66,10 +67,44 @@ def _normalize_action_id(rec: dict) -> int | None:
     return None
 
 
+def _task_keys() -> List[str]:
+    return ["compare_codes", "sequence_memory", "rule_switch", "parity_check", "radar_scan"]
+
+
+def _extract_task_offsets(rec: dict) -> dict:
+    payload = rec.get("task_offsets")
+    if not isinstance(payload, dict):
+        return {}
+    out = {}
+    for key in _task_keys():
+        try:
+            out[key] = int(payload.get(key, 0))
+        except (TypeError, ValueError):
+            out[key] = 0
+    return out
+
+
+def _task_actions_from_offsets(prev_offsets: dict, cur_offsets: dict) -> List[int]:
+    actions: List[int] = []
+    for key in _task_keys():
+        prev_v = int(prev_offsets.get(key, 0))
+        cur_v = int(cur_offsets.get(key, 0))
+        delta = cur_v - prev_v
+        if delta > 0:
+            aid = 2
+        elif delta < 0:
+            aid = 0
+        else:
+            aid = 1
+        actions.append(aid)
+    return actions
+
+
 def build_transitions(records: List[dict], modes: Optional[set] = None) -> List[Transition]:
     if modes is not None:
         records = [r for r in records if r.get("mode") in modes]
     transitions: List[Transition] = []
+    last_offsets_by_session: dict[str, dict] = {}
     for i in range(len(records)):
         cur = records[i]
         state = cur.get("state")
@@ -79,6 +114,12 @@ def build_transitions(records: List[dict], modes: Optional[set] = None) -> List[
         reward = cur.get("reward")
         if action is None or reward is None:
             continue
+        session_id = str(cur.get("session_id", "")).strip()
+        prev_offsets = last_offsets_by_session.get(session_id, {})
+        cur_offsets = _extract_task_offsets(cur)
+        task_actions = _task_actions_from_offsets(prev_offsets, cur_offsets)
+        if session_id:
+            last_offsets_by_session[session_id] = cur_offsets
 
         if i + 1 < len(records) and _same_episode(cur, records[i + 1]):
             nxt = records[i + 1]
@@ -95,6 +136,7 @@ def build_transitions(records: List[dict], modes: Optional[set] = None) -> List[
             Transition(
                 state=state,
                 action=int(action),
+                task_actions=task_actions,
                 reward=float(reward),
                 next_state=next_state,
                 done=done,

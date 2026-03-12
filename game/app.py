@@ -11,7 +11,7 @@ from typing import Dict, List
 import pygame
 
 from game.adaptation.baseline import BaselineAdapter, BaselineState
-from game.adaptation.levels import apply_level, apply_tempo
+from game.adaptation.levels import apply_level, apply_task_offsets, apply_tempo
 from game.adaptation.rl_agent import RLAgent
 from game.settings import DifficultyConfig, LevelConfig, SessionConfig, WindowConfig
 from game.runtime.auth import UserAuthStore
@@ -71,9 +71,8 @@ class GameApp:
         )
         self.current_level = self.level_cfg.start_level
         self.tempo_offset = 0
-        self.current_difficulty = apply_tempo(
-            apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-        )
+        self.task_offsets: Dict[str, int] = self._empty_task_offsets()
+        self.current_difficulty = self._build_effective_difficulty()
         self.events_log_path = app_data_path("events.jsonl")
         self.adapt_log_path = app_data_path("adaptations.jsonl")
         self.session_log_path = app_data_path("sessions.jsonl")
@@ -371,23 +370,24 @@ class GameApp:
         if self.selected_mode == "ppo" and self._rl_model_exists():
             _, _, delta_tempo = self.rl_agent.act(state)
             new_level = prev_level
-            new_tempo = max(-2, min(2, prev_tempo + delta_tempo))
+            new_tempo = self._clamp_tempo_for_level(prev_tempo + delta_tempo, prev_level)
+            self._apply_task_deltas(self.rl_agent.last_task_deltas or {})
             action_id = delta_tempo + 1
             delta_level = 0
         else:
             _, new_tempo = self.adapter.update(accuracy, mean_rt)
             new_level = prev_level
             self.adapter.state.level = prev_level
+            new_tempo = self._clamp_tempo_for_level(new_tempo, prev_level)
             delta_tempo = max(-1, min(1, new_tempo - prev_tempo))
+            self._relax_task_offsets_to_neutral()
             action_id = delta_tempo + 1
             delta_level = 0
             effective_mode = "baseline"
 
         self.current_level = new_level
         self.tempo_offset = new_tempo
-        self.current_difficulty = apply_tempo(
-            apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-        )
+        self.current_difficulty = self._build_effective_difficulty()
         self.task_manager.set_difficulty(self.current_difficulty)
         self.task_manager.set_level(self.current_level)
 
@@ -410,7 +410,8 @@ class GameApp:
             "level": self.current_level,
             "tempo_offset": self.tempo_offset,
             "mode": effective_mode,
-            "action_space": "tempo3",
+            "action_space": "tempo3_task_offsets_v1",
+            "task_offsets": dict(self.task_offsets),
         }
         self.adapt_logger.write(adaptation_record)
         self.telemetry.track(
@@ -444,6 +445,7 @@ class GameApp:
                 total_tasks=self.session.total_tasks,
                 level=self.current_level,
                 planets_visited=total_planets,
+                adaptation_label=self._adaptation_profile_label(),
             )
             self.ui.draw_focus_panel(focused_name, focused_time_left, show_timeout_alert)
             self.ui.draw_help_panel()
@@ -507,6 +509,7 @@ class GameApp:
             total_tasks=self.session.total_tasks,
             level=self.current_level,
             planets_visited=total_planets,
+            adaptation_label=self._adaptation_profile_label(),
         )
         self.ui.draw_focus_panel(None, None, False)
         self.ui.draw_help_panel()
@@ -692,12 +695,16 @@ class GameApp:
         mode_label = "Базовый" if self.selected_mode == "baseline" else "Адаптивный"
         mode_value = self.ui.font_mid.render(mode_label, True, self.ui.theme.text)
         self.screen.blit(mode_value, (right_top_box.x + 16, right_top_box.y + 50))
-        self.mode_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 90, right_top_box.width - 32, 30)
+        profile_line = self.ui.font_tiny.render(self._adaptation_profile_label(), True, self.ui.theme.text)
+        self.screen.blit(profile_line, (right_top_box.x + 16, right_top_box.y + 78))
+        task_profile_line = self.ui.font_tiny.render(self._task_profile_label(), True, self.ui.theme.text)
+        self.screen.blit(task_profile_line, (right_top_box.x + 16, right_top_box.y + 96))
+        self.mode_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 112, right_top_box.width - 32, 30)
         self._draw_compact_button(self.mode_toggle_rect, "Сменить режим", active=False)
         transition_label = "Переход: Пауза" if self.pause_between_levels else "Переход: Авто"
         transition_state = self.ui.font_mid.render(transition_label, True, self.ui.theme.text)
-        self.screen.blit(transition_state, (right_top_box.x + 16, right_top_box.y + 132))
-        self.level_transition_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 174, right_top_box.width - 32, 30)
+        self.screen.blit(transition_state, (right_top_box.x + 16, right_top_box.y + 146))
+        self.level_transition_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 188, right_top_box.width - 32, 30)
         self._draw_compact_button(self.level_transition_toggle_rect, "Переключить переход", active=False)
 
         warning = self._rl_warning()
@@ -1131,6 +1138,7 @@ class GameApp:
             "mode": self.selected_mode,
             "is_partial": 1,
             "exit_reason": reason,
+            "task_offsets": dict(self.task_offsets),
         }
         self.telemetry.track(
             event_type="session_end_partial",
@@ -1164,6 +1172,7 @@ class GameApp:
             "session_id": self.session_id,
             "current_level": self.current_level,
             "tempo_offset": self.tempo_offset,
+            "task_offsets": dict(self.task_offsets),
             "selected_mode": self.selected_mode,
             "stability": self.stability,
             "batch_result_start": self.batch_result_start,
@@ -1208,7 +1217,9 @@ class GameApp:
             self.level_cfg.min_level,
             min(self.level_cfg.max_level, int(snapshot.get("current_level", self.level_cfg.start_level))),
         )
-        self.tempo_offset = max(-2, min(2, int(snapshot.get("tempo_offset", 0))))
+        self.tempo_offset = self._clamp_tempo_for_level(int(snapshot.get("tempo_offset", 0)), self.current_level)
+        raw_offsets = snapshot.get("task_offsets", {})
+        self.task_offsets = self._normalize_task_offsets(raw_offsets)
         self.selected_mode = str(snapshot.get("selected_mode", self.session.adaptation_mode))
         self.stability = max(0.0, min(1.0, float(snapshot.get("stability", 0.0))))
         self.batch_result_start = max(0, int(snapshot.get("batch_result_start", 0)))
@@ -1239,9 +1250,7 @@ class GameApp:
         answered_in_batch = max(0, int(snapshot.get("batch_tasks_done", len(self.results) - self.batch_result_start)))
         answered_in_batch = min(answered_in_batch, self.session.total_tasks)
 
-        self.current_difficulty = apply_tempo(
-            apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-        )
+        self.current_difficulty = self._build_effective_difficulty()
         self.task_manager = TaskManager(
             self.current_difficulty,
             total_tasks=self.session.total_tasks,
@@ -1281,9 +1290,8 @@ class GameApp:
     def _begin_user_run(self, start_level: int) -> None:
         self.current_level = max(self.level_cfg.min_level, min(self.level_cfg.max_level, start_level))
         self.tempo_offset = 0
-        self.current_difficulty = apply_tempo(
-            apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-        )
+        self.task_offsets = self._empty_task_offsets()
+        self.current_difficulty = self._build_effective_difficulty()
         self.task_manager = TaskManager(
             self.current_difficulty,
             total_tasks=self.session.total_tasks,
@@ -1485,6 +1493,107 @@ class GameApp:
         new_total = self.auth_store.increment_user_stat(self.user_id, "total_planets", float(delta))
         self.user_progress["total_planets"] = new_total
 
+    @staticmethod
+    def _empty_task_offsets() -> Dict[str, int]:
+        return {
+            "compare_codes": 0,
+            "sequence_memory": 0,
+            "rule_switch": 0,
+            "parity_check": 0,
+            "radar_scan": 0,
+        }
+
+    def _normalize_task_offsets(self, payload: object) -> Dict[str, int]:
+        base = self._empty_task_offsets()
+        if not isinstance(payload, dict):
+            return base
+        for key in base.keys():
+            try:
+                raw = int(payload.get(key, 0))
+            except (TypeError, ValueError):
+                raw = 0
+            base[key] = self._clamp_task_offset(raw, self.current_level)
+        return base
+
+    @staticmethod
+    def _tempo_bounds_for_level(level: int) -> tuple[int, int]:
+        # Уровень — основной контур сложности, RL двигает темп только в допустимых пределах.
+        if level <= 5:
+            return -1, 1
+        if level <= 8:
+            return -2, 1
+        return -2, 2
+
+    @staticmethod
+    def _task_offset_bounds_for_level(level: int) -> tuple[int, int]:
+        # На низких уровнях не усложняем задачу, только можем смягчить.
+        if level <= 3:
+            return -1, 0
+        return -1, 1
+
+    def _clamp_tempo_for_level(self, tempo_offset: int, level: int) -> int:
+        low, high = self._tempo_bounds_for_level(level)
+        return max(low, min(high, int(tempo_offset)))
+
+    def _clamp_task_offset(self, task_offset: int, level: int) -> int:
+        low, high = self._task_offset_bounds_for_level(level)
+        return max(low, min(high, int(task_offset)))
+
+    def _build_effective_difficulty(self) -> DifficultyConfig:
+        base_by_level = apply_level(self.base_difficulty, self.current_level)
+        with_tempo = apply_tempo(base_by_level, self.tempo_offset)
+        return apply_task_offsets(with_tempo, self.task_offsets)
+
+    def _apply_task_deltas(self, deltas: Dict[str, int]) -> None:
+        for key in self.task_offsets.keys():
+            delta = 0
+            if isinstance(deltas, dict):
+                try:
+                    delta = int(deltas.get(key, 0))
+                except (TypeError, ValueError):
+                    delta = 0
+            cur = int(self.task_offsets.get(key, 0))
+            self.task_offsets[key] = self._clamp_task_offset(cur + delta, self.current_level)
+
+    def _relax_task_offsets_to_neutral(self) -> None:
+        for key, value in list(self.task_offsets.items()):
+            cur = int(value)
+            if cur > 0:
+                cur -= 1
+            elif cur < 0:
+                cur += 1
+            self.task_offsets[key] = self._clamp_task_offset(cur, self.current_level)
+
+    def _adaptation_profile_label(self) -> str:
+        if self.tempo_offset <= -2:
+            return "Адаптация: сильно мягче"
+        if self.tempo_offset == -1:
+            return "Адаптация: мягче"
+        if self.tempo_offset == 0:
+            return "Адаптация: стабильно"
+        if self.tempo_offset == 1:
+            return "Адаптация: интенсивнее"
+        return "Адаптация: максимально интенсивно"
+
+    def _task_profile_label(self) -> str:
+        labels = {
+            "compare_codes": "Коды",
+            "sequence_memory": "Память",
+            "rule_switch": "Правила",
+            "parity_check": "Четность",
+            "radar_scan": "Радар",
+        }
+        soft = [labels[k] for k, v in self.task_offsets.items() if int(v) < 0 and k in labels]
+        hard = [labels[k] for k, v in self.task_offsets.items() if int(v) > 0 and k in labels]
+        if not soft and not hard:
+            return "Профиль задач: нейтрально"
+        chunks: List[str] = []
+        if soft:
+            chunks.append("мягче: " + ",".join(soft[:2]))
+        if hard:
+            chunks.append("сложнее: " + ",".join(hard[:2]))
+        return "Профиль задач: " + " | ".join(chunks)
+
     def _rl_warning(self) -> str:
         if self._rl_model_exists():
             return ""
@@ -1573,6 +1682,7 @@ class GameApp:
         record["max_level"] = self.current_level
         record["last_level"] = self.current_level
         record["planets_visited"] = self.planets_visited
+        record["task_offsets"] = dict(self.task_offsets)
         self.session_logger.write(record)
         self.telemetry.track(
             event_type="session_end",
@@ -1653,9 +1763,7 @@ class GameApp:
 
         if answered == 0:
             self.last_feedback_text = "Нет ответов. Нажми Старт, чтобы продолжить."
-            self.current_difficulty = apply_tempo(
-                apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-            )
+            self.current_difficulty = self._build_effective_difficulty()
             self.task_manager = TaskManager(
                 self.current_difficulty,
                 total_tasks=self.session.total_tasks,
@@ -1694,7 +1802,7 @@ class GameApp:
                 self.current_level += 1
                 did_level_up = True
             elif self.selected_mode != "baseline":
-                self.tempo_offset = min(2, self.tempo_offset + 1)
+                self.tempo_offset = self._clamp_tempo_for_level(self.tempo_offset + 1, self.current_level)
             if did_level_up:
                 self.planets_visited += 1
                 self._increment_total_planets(1)
@@ -1719,9 +1827,8 @@ class GameApp:
                 f"Результат {correct}/{self.session.total_tasks}. Уровень не изменился."
             )
 
-        self.current_difficulty = apply_tempo(
-            apply_level(self.base_difficulty, self.current_level), self.tempo_offset
-        )
+        self.tempo_offset = self._clamp_tempo_for_level(self.tempo_offset, self.current_level)
+        self.current_difficulty = self._build_effective_difficulty()
         self.task_manager = TaskManager(
             self.current_difficulty,
             total_tasks=self.session.total_tasks,
