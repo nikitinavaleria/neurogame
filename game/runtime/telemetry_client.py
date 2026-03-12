@@ -86,14 +86,25 @@ class TelemetryClient:
         try:
             with request.urlopen(req, timeout=self.timeout_sec) as resp:
                 if resp.status != 200:
+                    self.last_error = f"http_{resp.status}"
                     return
                 raw = resp.read().decode("utf-8") or "{}"
                 data = json.loads(raw)
                 if not isinstance(data, dict) or data.get("ok") is not True:
                     self.last_error = "invalid_server_response"
                     return
-        except (error.URLError, error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+        except error.HTTPError as exc:
+            detail = self._read_error_detail(exc)
+            if exc.code == 401 or detail == "invalid_api_key":
+                self.last_error = "invalid_api_key"
+            else:
+                self.last_error = f"http_{exc.code}"
+            return
+        except (error.URLError, TimeoutError, OSError):
             self.last_error = "connection_error"
+            return
+        except json.JSONDecodeError:
+            self.last_error = "invalid_server_response"
             return
 
         self.queue = self.queue[len(batch) :]
@@ -144,14 +155,60 @@ class TelemetryClient:
                 raw = resp.read().decode("utf-8") or "{}"
                 payload = json.loads(raw)
                 if isinstance(payload, dict) and payload.get("ok") is True:
-                    self.last_error = ""
-                    self.last_success_ts = time.time()
-                    return True, "Подключение подтверждено"
+                    auth_ok, auth_message = self._check_ingest_auth()
+                    if auth_ok:
+                        self.last_error = ""
+                        self.last_success_ts = time.time()
+                        return True, "Подключение и ключ подтверждены"
+                    return False, auth_message
                 self.last_error = "health_payload_error"
                 return False, "Сервер ответил некорректно"
         except (error.URLError, error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
             self.last_error = "connection_error"
             return False, "Нет связи с сервером"
+
+    def _check_ingest_auth(self) -> tuple[bool, str]:
+        body = {
+            "api_key": self.api_key,
+            "client_version": self.client_version,
+            "sent_at": _utc_now_iso(),
+            "events": [],
+        }
+        req = request.Request(
+            self.endpoint_url,
+            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self.timeout_sec):
+                # Сервер /v1/events не должен принимать пустой events.
+                return True, "Подключение подтверждено"
+        except error.HTTPError as exc:
+            detail = self._read_error_detail(exc)
+            # Валидный ключ + пустой батч => ожидаемая 400.
+            if exc.code == 400 and detail == "events_must_be_nonempty_list":
+                self.last_error = ""
+                return True, "Подключение и ключ подтверждены"
+            if exc.code == 401 or detail == "invalid_api_key":
+                self.last_error = "invalid_api_key"
+                return False, "Неверный API-ключ телеметрии"
+            self.last_error = f"http_{exc.code}"
+            return False, "Сервер недоступен для приёма событий"
+        except (error.URLError, TimeoutError, OSError):
+            self.last_error = "connection_error"
+            return False, "Нет связи с сервером"
+
+    @staticmethod
+    def _read_error_detail(exc: error.HTTPError) -> str:
+        try:
+            raw = exc.read().decode("utf-8") or "{}"
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                return str(payload.get("detail", "")).strip()
+        except (OSError, json.JSONDecodeError):
+            return ""
+        return ""
 
     def _load_queue(self) -> list[dict[str, Any]]:
         if not self.queue_path.exists():

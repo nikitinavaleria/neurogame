@@ -15,15 +15,43 @@ from analytics.raw_transform import to_jsonl, transform_raw_events
 @dataclass(frozen=True)
 class AnalyticsConfig:
     fetch_from_backend: bool = True
-    server: str = os.getenv("NEUROGAME_BACKEND_URL", "http://127.0.0.1:8000").strip()
-    api_key: str = os.getenv("NEUROGAME_API_KEY", "").strip()
+    server: str = "http://127.0.0.1:8000"
+    api_key: str = ""
     page_size: int = 1000
     max_pages: int = 10000
     dataset_dir: str = "analytics/data"
     reports_dir: str = "analytics/reports"
 
 
-RUN_CONFIG = AnalyticsConfig()
+def _load_env_defaults() -> None:
+    root = Path(__file__).resolve().parents[1]
+    for path in (Path.cwd() / ".env", root / ".env"):
+        if not path.exists():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key.startswith("NEUROGAME_"):
+                continue
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                value = value[1:-1]
+            os.environ.setdefault(key, value)
+
+
+def _build_config() -> AnalyticsConfig:
+    return AnalyticsConfig(
+        fetch_from_backend=True,
+        server=os.getenv("NEUROGAME_BACKEND_URL", "http://127.0.0.1:8000").strip(),
+        api_key=os.getenv("NEUROGAME_API_KEY", "").strip(),
+    )
 
 
 def _join_base(base: str, path: str) -> str:
@@ -115,7 +143,8 @@ def build_comparison_report(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def main() -> None:
-    cfg = RUN_CONFIG
+    _load_env_defaults()
+    cfg = _build_config()
     dataset_dir = Path(cfg.dataset_dir)
     dataset_dir.mkdir(parents=True, exist_ok=True)
     events_path = dataset_dir / "events.jsonl"

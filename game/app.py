@@ -1038,6 +1038,10 @@ class GameApp:
             return "Адрес не указан. Свяжитесь с тех. специалистом.", False
         if not TelemetryClient.is_valid_endpoint(url):
             return "Некорректный адрес. Укажите http(s)-адрес сервера.", False
+        if self.telemetry.last_error == "invalid_api_key":
+            return "Неверный API-ключ телеметрии. Проверьте NEUROGAME_API_KEY.", False
+        if self.telemetry.last_error.startswith("http_"):
+            return "Сервер телеметрии ответил ошибкой. Проверьте доступ и настройки.", False
         if self.telemetry_status_message:
             return self.telemetry_status_message, self.telemetry_status_ok
         if self.telemetry.queue_size() > 0:
