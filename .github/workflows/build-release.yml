@@ -32,7 +32,6 @@ jobs:
         with:
           name: neurogame-linux
           path: |
-            dist/NeuroGame/
             dist/neurogame-*.zip
 
   build-macos:
@@ -104,6 +103,5 @@ jobs:
         with:
           name: neurogame-windows
           path: |
-            dist/NeuroGame/
             dist/NeuroGameSetup.exe
             dist/neurogame-*.zip
