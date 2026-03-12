@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -36,6 +37,8 @@ class TelemetryClient:
         self.last_flush_ts: float = 0.0
         self.last_error: str = ""
         self.last_success_ts: float = 0.0
+        self._lock = threading.Lock()
+        self._flush_in_progress = False
 
     def track(
         self,
@@ -58,61 +61,94 @@ class TelemetryClient:
             "model_version": model_version or "",
             "payload": payload,
         }
-        self.queue.append(event)
-        self._save_queue()
-        self.flush()
+        with self._lock:
+            self.queue.append(event)
+            self._save_queue_unlocked()
 
     def flush(self, force: bool = False) -> None:
-        if not self.enabled or not self.queue:
-            return
-        now = time.time()
-        if not force and (now - self.last_flush_ts) < self.flush_interval_sec:
-            return
-        self.last_flush_ts = now
-        batch = self.queue[: self.max_batch_size]
-        body = {
-            "api_key": self.api_key,
-            "client_version": self.client_version,
-            "sent_at": _utc_now_iso(),
-            "events": batch,
-        }
-        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        req = request.Request(
-            self.endpoint_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with request.urlopen(req, timeout=self.timeout_sec) as resp:
-                if resp.status != 200:
-                    self.last_error = f"http_{resp.status}"
-                    return
-                raw = resp.read().decode("utf-8") or "{}"
-                data = json.loads(raw)
-                if not isinstance(data, dict) or data.get("ok") is not True:
-                    self.last_error = "invalid_server_response"
-                    return
-        except error.HTTPError as exc:
-            detail = self._read_error_detail(exc)
-            if exc.code == 401 or detail == "invalid_api_key":
-                self.last_error = "invalid_api_key"
-            else:
-                self.last_error = f"http_{exc.code}"
-            return
-        except (error.URLError, TimeoutError, OSError):
-            self.last_error = "connection_error"
-            return
-        except json.JSONDecodeError:
-            self.last_error = "invalid_server_response"
-            return
+        with self._lock:
+            if not self.enabled or not self.queue:
+                return
+            now = time.time()
+            if not force and (now - self.last_flush_ts) < self.flush_interval_sec:
+                return
+            if self._flush_in_progress:
+                return
+            self._flush_in_progress = True
+            self.last_flush_ts = now
+        thread = threading.Thread(target=self._flush_worker, args=(force,), daemon=True)
+        thread.start()
 
-        self.queue = self.queue[len(batch) :]
-        self.last_error = ""
-        self.last_success_ts = time.time()
-        self._save_queue()
-        if self.queue and force:
-            self.flush(force=True)
+    def _flush_worker(self, force: bool) -> None:
+        try:
+            while True:
+                with self._lock:
+                    if not self.enabled or not self.queue:
+                        self._flush_in_progress = False
+                        return
+                    batch = self.queue[: self.max_batch_size]
+                    endpoint_url = self.endpoint_url
+                    api_key = self.api_key
+                    client_version = self.client_version
+                body = {
+                    "api_key": api_key,
+                    "client_version": client_version,
+                    "sent_at": _utc_now_iso(),
+                    "events": batch,
+                }
+                payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+                req = request.Request(
+                    endpoint_url,
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    with request.urlopen(req, timeout=self.timeout_sec) as resp:
+                        if resp.status != 200:
+                            with self._lock:
+                                self.last_error = f"http_{resp.status}"
+                                self._flush_in_progress = False
+                            return
+                        raw = resp.read().decode("utf-8") or "{}"
+                        data = json.loads(raw)
+                        if not isinstance(data, dict) or data.get("ok") is not True:
+                            with self._lock:
+                                self.last_error = "invalid_server_response"
+                                self._flush_in_progress = False
+                            return
+                except error.HTTPError as exc:
+                    detail = self._read_error_detail(exc)
+                    with self._lock:
+                        if exc.code == 401 or detail == "invalid_api_key":
+                            self.last_error = "invalid_api_key"
+                        else:
+                            self.last_error = f"http_{exc.code}"
+                        self._flush_in_progress = False
+                    return
+                except (error.URLError, TimeoutError, OSError):
+                    with self._lock:
+                        self.last_error = "connection_error"
+                        self._flush_in_progress = False
+                    return
+                except json.JSONDecodeError:
+                    with self._lock:
+                        self.last_error = "invalid_server_response"
+                        self._flush_in_progress = False
+                    return
+
+                with self._lock:
+                    self.queue = self.queue[len(batch) :]
+                    self.last_error = ""
+                    self.last_success_ts = time.time()
+                    self._save_queue_unlocked()
+                    if not (force and self.queue):
+                        self._flush_in_progress = False
+                        return
+        except Exception:
+            with self._lock:
+                self._flush_in_progress = False
+            raise
 
     @staticmethod
     def is_valid_endpoint(url: str) -> bool:
@@ -120,15 +156,18 @@ class TelemetryClient:
         return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
     def set_endpoint(self, endpoint_url: str) -> None:
-        self.endpoint_url = endpoint_url.strip()
-        self.enabled = bool(self.endpoint_url and self.api_key)
+        with self._lock:
+            self.endpoint_url = endpoint_url.strip()
+            self.enabled = bool(self.endpoint_url and self.api_key)
 
     def set_api_key(self, api_key: str) -> None:
-        self.api_key = api_key.strip()
-        self.enabled = bool(self.endpoint_url and self.api_key)
+        with self._lock:
+            self.api_key = api_key.strip()
+            self.enabled = bool(self.endpoint_url and self.api_key)
 
     def queue_size(self) -> int:
-        return len(self.queue)
+        with self._lock:
+            return len(self.queue)
 
     def check_connection(self) -> tuple[bool, str]:
         if not self.enabled:
@@ -228,6 +267,10 @@ class TelemetryClient:
         return events
 
     def _save_queue(self) -> None:
+        with self._lock:
+            self._save_queue_unlocked()
+
+    def _save_queue_unlocked(self) -> None:
         if not self.queue:
             try:
                 self.queue_path.unlink(missing_ok=True)
