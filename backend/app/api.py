@@ -4,13 +4,25 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.config import load_settings
-from app.db import ensure_db, read_raw_events, write_batch
+from app.db import (
+    authenticate_auth_user,
+    ensure_db,
+    read_raw_events,
+    register_auth_user,
+    write_batch,
+)
 from app.leaderboard import build_leaderboard
 
 REQUIRED_EVENT_FIELDS = ("event_id", "event_type", "event_ts", "user_id", "session_id", "payload")
 
 settings = load_settings()
 app = FastAPI(title="Neurogame Events API", version="0.1.0")
+
+
+def _require_api_key(body: dict[str, Any]) -> None:
+    api_key = str(body.get("api_key", ""))
+    if not api_key or api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="invalid_api_key")
 
 
 @app.on_event("startup")
@@ -25,9 +37,8 @@ def health() -> dict[str, bool]:
 
 @app.post("/v1/events")
 def ingest_events(body: dict[str, Any]) -> JSONResponse:
+    _require_api_key(body)
     api_key = str(body.get("api_key", ""))
-    if not api_key or api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="invalid_api_key")
 
     events = body.get("events")
     if not isinstance(events, list) or not events:
@@ -55,6 +66,36 @@ def ingest_events(body: dict[str, Any]) -> JSONResponse:
         events=normalized_events,
     )
     return JSONResponse(content={"ok": True}, status_code=200)
+
+
+@app.post("/v1/auth/register")
+def register_user(body: dict[str, Any]) -> JSONResponse:
+    _require_api_key(body)
+    username = str(body.get("username", "")).strip()
+    password = str(body.get("password", ""))
+    ok, code, user_id = register_auth_user(settings.db_path, username, password)
+    if not ok:
+        if code in ("username_required", "username_invalid_length", "username_invalid_chars", "password_too_short"):
+            raise HTTPException(status_code=400, detail=code)
+        if code == "user_exists":
+            raise HTTPException(status_code=409, detail=code)
+        raise HTTPException(status_code=500, detail="auth_register_failed")
+    return JSONResponse(content={"ok": True, "user_id": user_id}, status_code=200)
+
+
+@app.post("/v1/auth/login")
+def login_user(body: dict[str, Any]) -> JSONResponse:
+    _require_api_key(body)
+    username = str(body.get("username", "")).strip()
+    password = str(body.get("password", ""))
+    ok, code, user_id = authenticate_auth_user(settings.db_path, username, password)
+    if not ok:
+        if code == "username_required":
+            raise HTTPException(status_code=400, detail=code)
+        if code in ("user_not_found", "invalid_password"):
+            raise HTTPException(status_code=401, detail=code)
+        raise HTTPException(status_code=500, detail="auth_login_failed")
+    return JSONResponse(content={"ok": True, "user_id": user_id}, status_code=200)
 
 
 @app.get("/v1/leaderboard")

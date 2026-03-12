@@ -132,7 +132,11 @@ class GameApp:
         self.batch_index: int = 1
         self.planets_visited: int = 0
         self.selected_mode = self.session.adaptation_mode
-        self.auth_store = UserAuthStore(str(self.users_path))
+        self.auth_store = UserAuthStore(
+            str(self.users_path),
+            endpoint_url=self.telemetry_url_value,
+            api_key=self.telemetry_api_key_value,
+        )
         self.user_id: str | None = None
         self.authenticated: bool = False
         self.auth_mode: str = "login"
@@ -1055,12 +1059,14 @@ class GameApp:
             self.telemetry_status_ok = False
             return
         self.telemetry.set_endpoint(url)
+        self.auth_store.set_backend(url, self.telemetry_api_key_value)
         self._save_telemetry_settings(url, self.telemetry_api_key_value)
         self.telemetry_status_message = "Адрес сохранен."
         self.telemetry_status_ok = True
 
     def _check_telemetry_connection(self) -> None:
         self.telemetry.set_endpoint(self.telemetry_url_value.strip())
+        self.auth_store.set_backend(self.telemetry_url_value.strip(), self.telemetry_api_key_value)
         ok, message = self.telemetry.check_connection()
         self.telemetry_status_message = message
         self.telemetry_status_ok = ok

@@ -6,6 +6,8 @@ API для приема телеметрии игры
 
 - `GET /health`
 - `POST /v1/events`
+- `POST /v1/auth/register`
+- `POST /v1/auth/login`
 - `GET /v1/leaderboard`
 - `GET /v1/export/raw`
 
@@ -36,3 +38,31 @@ API для приема телеметрии игры
 ```
 
 `event_id` идемпотентный: дубликаты игнорируются
+
+## Формат авторизации
+
+Регистрация:
+
+```json
+{
+  "api_key": "replace-me",
+  "username": "pilot_01",
+  "password": "secret"
+}
+```
+
+Логин:
+
+```json
+{
+  "api_key": "replace-me",
+  "username": "pilot_01",
+  "password": "secret"
+}
+```
+
+Обе ручки возвращают:
+
+```json
+{"ok": true, "user_id": "pilot_01"}
+```

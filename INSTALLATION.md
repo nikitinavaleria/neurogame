@@ -1,6 +1,6 @@
 ## 1. Требования к среде выполнения
 
-- ОС: `Windows` или `macOS`.
+- ОС: `Windows`, `macOS` или `Linux`.
 - Python: `3.12`.
 - Пакетный менеджер: `pip`.
 - Терминал для запуска модулей.
@@ -202,9 +202,11 @@ python -m analytics.pipeline
 - ручной запуск (`workflow_dispatch`).
 
 3. Состав CI-сборки:
+- `build-linux`: сборка Linux-бинаря и zip-архива;
 - `build-macos`: сборка приложения и DMG;
 - `build-windows`: сборка `.exe` и инсталлятора Inno Setup.
 
 4. Публикуемые артефакты:
+- Linux: `NeuroGame`, `neurogame-*.zip`;
 - macOS: `NeuroGame`, `NeuroGame.app`, `NeuroGame.dmg`, `neurogame-*.zip`;
 - Windows: `NeuroGame.exe`, `NeuroGameSetup.exe`, `neurogame-*.zip`.

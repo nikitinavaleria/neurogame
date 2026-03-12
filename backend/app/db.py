@@ -1,6 +1,10 @@
+import base64
 import hashlib
+import hmac
 import json
+import os
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +49,18 @@ def ensure_db(path: Path) -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events_raw(event_type, event_ts);"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users_auth (
+                user_id TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                salt_b64 TEXT NOT NULL,
+                pwd_hash_b64 TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                last_login_at INTEGER
+            );
+            """
         )
 
 
@@ -133,3 +149,79 @@ def read_raw_events(
             }
         )
     return records
+
+
+def register_auth_user(db_path: Path, username: str, password: str) -> tuple[bool, str, str]:
+    username = str(username or "").strip()
+    if not username:
+        return False, "username_required", ""
+    if len(username) < 3 or len(username) > 24:
+        return False, "username_invalid_length", ""
+    if not all(ch.isalnum() or ch in "._-" for ch in username):
+        return False, "username_invalid_chars", ""
+    if len(password) < 4:
+        return False, "password_too_short", ""
+
+    user_id = username.lower()
+    salt = os.urandom(16)
+    pwd_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+    created_at = int(time.time())
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        exists = cur.execute(
+            "SELECT 1 FROM users_auth WHERE user_id = ? LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        if exists:
+            return False, "user_exists", ""
+        cur.execute(
+            """
+            INSERT INTO users_auth (user_id, username, salt_b64, pwd_hash_b64, created_at, last_login_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                username,
+                base64.b64encode(salt).decode("ascii"),
+                base64.b64encode(pwd_hash).decode("ascii"),
+                created_at,
+                created_at,
+            ),
+        )
+        conn.commit()
+    return True, "ok", user_id
+
+
+def authenticate_auth_user(db_path: Path, username: str, password: str) -> tuple[bool, str, str]:
+    user_id = str(username or "").strip().lower()
+    if not user_id:
+        return False, "username_required", ""
+
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        row = cur.execute(
+            """
+            SELECT salt_b64, pwd_hash_b64
+            FROM users_auth
+            WHERE user_id = ?
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return False, "user_not_found", ""
+        salt_b64, pwd_hash_b64 = row
+        try:
+            salt = base64.b64decode(salt_b64)
+            expected = base64.b64decode(pwd_hash_b64)
+        except Exception:
+            return False, "user_data_corrupted", ""
+        got = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+        if not hmac.compare_digest(got, expected):
+            return False, "invalid_password", ""
+        cur.execute(
+            "UPDATE users_auth SET last_login_at = ? WHERE user_id = ?",
+            (int(time.time()), user_id),
+        )
+        conn.commit()
+    return True, "ok", user_id
