@@ -1,12 +1,22 @@
 {
   "state_dim": 12,
-  "action_dim": 3,
-  "action_space": "tempo3",
+  "action_dim": 18,
+  "action_space": "tempo3_task_offsets_v1",
+  "task_heads": [
+    "compare_codes",
+    "sequence_memory",
+    "rule_switch",
+    "parity_check",
+    "radar_scan"
+  ],
   "transitions": 45,
-  "epochs": 40,
-  "batch_size": 64,
+  "epochs": 60,
+  "batch_size": 32,
   "lr": 0.0003,
   "gamma": 0.97,
   "mode_filter": "all",
-  "data_path": "/Users/leranikitina/PycharmProjects/neurogame/training/data/adaptations.jsonl"
+  "data_path": "/Users/leranikitina/PycharmProjects/neurogame/training/data/adaptations.jsonl",
+  "algo": "offline_cql_q_learning",
+  "cql_alpha": 1.0,
+  "target_tau": 0.02
 }

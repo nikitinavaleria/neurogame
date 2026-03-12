@@ -375,7 +375,9 @@ class GameApp:
             action_id = delta_tempo + 1
             delta_level = 0
         else:
-            _, new_tempo = self.adapter.update(accuracy, mean_rt)
+            # Baseline intentionally stays neutral to make PPO gains observable:
+            # no dynamic tempo policy and no task-level personalization.
+            new_tempo = 0
             new_level = prev_level
             self.adapter.state.level = prev_level
             new_tempo = self._clamp_tempo_for_level(new_tempo, prev_level)
@@ -445,7 +447,6 @@ class GameApp:
                 total_tasks=self.session.total_tasks,
                 level=self.current_level,
                 planets_visited=total_planets,
-                adaptation_label=self._adaptation_profile_label(),
             )
             self.ui.draw_focus_panel(focused_name, focused_time_left, show_timeout_alert)
             self.ui.draw_help_panel()
@@ -509,7 +510,6 @@ class GameApp:
             total_tasks=self.session.total_tasks,
             level=self.current_level,
             planets_visited=total_planets,
-            adaptation_label=self._adaptation_profile_label(),
         )
         self.ui.draw_focus_panel(None, None, False)
         self.ui.draw_help_panel()
@@ -695,10 +695,6 @@ class GameApp:
         mode_label = "Базовый" if self.selected_mode == "baseline" else "Адаптивный"
         mode_value = self.ui.font_mid.render(mode_label, True, self.ui.theme.text)
         self.screen.blit(mode_value, (right_top_box.x + 16, right_top_box.y + 50))
-        profile_line = self.ui.font_tiny.render(self._adaptation_profile_label(), True, self.ui.theme.text)
-        self.screen.blit(profile_line, (right_top_box.x + 16, right_top_box.y + 78))
-        task_profile_line = self.ui.font_tiny.render(self._task_profile_label(), True, self.ui.theme.text)
-        self.screen.blit(task_profile_line, (right_top_box.x + 16, right_top_box.y + 96))
         self.mode_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 112, right_top_box.width - 32, 30)
         self._draw_compact_button(self.mode_toggle_rect, "Сменить режим", active=False)
         transition_label = "Переход: Пауза" if self.pause_between_levels else "Переход: Авто"

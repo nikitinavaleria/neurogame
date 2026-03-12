@@ -43,6 +43,18 @@ def _as_dict(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _normalize_task_offsets(value: Any) -> dict[str, int]:
+    raw = _as_dict(value)
+    keys = ("compare_codes", "sequence_memory", "rule_switch", "parity_check", "radar_scan")
+    out: dict[str, int] = {}
+    for key in keys:
+        try:
+            out[key] = int(raw.get(key, 0))
+        except (TypeError, ValueError):
+            out[key] = 0
+    return out
+
+
 def _infer_mode(model_version: Any, payload: dict[str, Any]) -> str:
     if isinstance(payload.get("mode"), str):
         return payload["mode"]
@@ -112,6 +124,7 @@ def transform_raw_events(
                     "tempo_offset": int(payload.get("tempo_offset", 0)),
                     "mode": _infer_mode(model_version, payload),
                     "action_space": payload.get("action_space", "tempo3"),
+                    "task_offsets": _normalize_task_offsets(payload.get("task_offsets")),
                     "source_event_id": event_id,
                 }
             )

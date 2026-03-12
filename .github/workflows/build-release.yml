@@ -62,9 +62,8 @@ jobs:
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: neurogame-macos
+          name: neurogame-macos-${{ runner.arch }}
           path: |
-            dist/NeuroGame
             dist/NeuroGame.app
             dist/NeuroGame.dmg
             dist/neurogame-*.zip

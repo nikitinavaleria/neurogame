@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "sessions": 8,
+    "accuracy_total": 0.6923922012015825,
+    "mean_rt": 2339.7801697346117,
+    "rt_variance": 2576746.6324374676,
+    "switch_cost": 256.8843448218448,
+    "fatigue_trend": -14.096267326680515,
+    "answered_rate": 0.6689700314805745,
+    "active_batches": 6.0,
+    "idle_batches": 0.375,
+    "level_gain": 2.25
+  }
+}
