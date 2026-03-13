@@ -19,8 +19,35 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install pygame numpy
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
           python -m pip install pyinstaller
+
+      - name: Prepare client env defaults
+        env:
+          BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
+          BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
+          BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          telemetry_url = os.getenv("BUILD_TELEMETRY_URL", "").strip() or "http://45.159.211.104:8000/v1/events"
+          default_telemetry_url = os.getenv("BUILD_DEFAULT_TELEMETRY_URL", "").strip() or telemetry_url
+          api_key = os.getenv("BUILD_API_KEY", "").strip() or "change_me"
+          backend_url = telemetry_url.replace("/v1/events", "").rstrip("/")
+
+          payload = "\n".join(
+              [
+                  f"NEUROGAME_API_KEY={api_key}",
+                  f"NEUROGAME_BACKEND_URL={backend_url}",
+                  f"NEUROGAME_TELEMETRY_URL={telemetry_url}",
+                  f"NEUROGAME_DEFAULT_TELEMETRY_URL={default_telemetry_url}",
+              ]
+          ) + "\n"
+          Path(".env").write_text(payload, encoding="utf-8")
+          PY
 
       - name: Build executable
         env:
@@ -51,6 +78,32 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
+
+      - name: Prepare client env defaults
+        env:
+          BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
+          BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
+          BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          telemetry_url = os.getenv("BUILD_TELEMETRY_URL", "").strip() or "http://45.159.211.104:8000/v1/events"
+          default_telemetry_url = os.getenv("BUILD_DEFAULT_TELEMETRY_URL", "").strip() or telemetry_url
+          api_key = os.getenv("BUILD_API_KEY", "").strip() or "change_me"
+          backend_url = telemetry_url.replace("/v1/events", "").rstrip("/")
+
+          payload = "\n".join(
+              [
+                  f"NEUROGAME_API_KEY={api_key}",
+                  f"NEUROGAME_BACKEND_URL={backend_url}",
+                  f"NEUROGAME_TELEMETRY_URL={telemetry_url}",
+                  f"NEUROGAME_DEFAULT_TELEMETRY_URL={default_telemetry_url}",
+              ]
+          ) + "\n"
+          Path(".env").write_text(payload, encoding="utf-8")
+          PY
 
       - name: Build executable
         run: python packaging/build_desktop.py
@@ -84,6 +137,32 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
+
+      - name: Prepare client env defaults
+        env:
+          BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
+          BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
+          BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          telemetry_url = os.getenv("BUILD_TELEMETRY_URL", "").strip() or "http://45.159.211.104:8000/v1/events"
+          default_telemetry_url = os.getenv("BUILD_DEFAULT_TELEMETRY_URL", "").strip() or telemetry_url
+          api_key = os.getenv("BUILD_API_KEY", "").strip() or "change_me"
+          backend_url = telemetry_url.replace("/v1/events", "").rstrip("/")
+
+          payload = "\n".join(
+              [
+                  f"NEUROGAME_API_KEY={api_key}",
+                  f"NEUROGAME_BACKEND_URL={backend_url}",
+                  f"NEUROGAME_TELEMETRY_URL={telemetry_url}",
+                  f"NEUROGAME_DEFAULT_TELEMETRY_URL={default_telemetry_url}",
+              ]
+          ) + "\n"
+          Path(".env").write_text(payload, encoding="utf-8")
+          PY
 
       - name: Build executable
         env:
