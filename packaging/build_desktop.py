@@ -47,6 +47,8 @@ def main() -> None:
     main_py = root / "main.py"
     data_dir = root / "data"
     assets_dir = root / "game" / "assets"
+    env_path = root / ".env"
+    env_example_path = root / ".env.server.example"
 
     print("[1/4] Checking PyInstaller...")
     pyinstaller_installed = importlib.util.find_spec("PyInstaller") is not None
@@ -108,6 +110,12 @@ def main() -> None:
         add_data_args.extend(["--add-data", f"{assets_dir}{add_data_sep}game/assets"])
     else:
         raise FileNotFoundError(f"Required assets directory not found: {assets_dir}")
+    if env_path.exists():
+        add_data_args.extend(["--add-data", f"{env_path}{add_data_sep}."])
+    elif env_example_path.exists():
+        add_data_args.extend(["--add-data", f"{env_example_path}{add_data_sep}."])
+    else:
+        print("Warning: no .env or .env.server.example found, using runtime defaults")
     build_cmd[-1:-1] = add_data_args
     # macOS dmg works more reliably with native .app (onedir).
     if sys.platform.startswith("darwin"):

@@ -17,6 +17,8 @@ else
   ADD_DATA_SEP=":"
 fi
 ASSETS_DIR="$ROOT_DIR/game/assets"
+ENV_PATH="$ROOT_DIR/.env"
+ENV_EXAMPLE_PATH="$ROOT_DIR/.env.server.example"
 ADD_DATA_ARGS=()
 if [[ -d "$ROOT_DIR/data" ]]; then
   ADD_DATA_ARGS+=(--add-data "$ROOT_DIR/data${ADD_DATA_SEP}data")
@@ -28,6 +30,13 @@ if [[ -d "$ASSETS_DIR" ]]; then
 else
   echo "Required assets directory not found: $ASSETS_DIR"
   exit 1
+fi
+if [[ -f "$ENV_PATH" ]]; then
+  ADD_DATA_ARGS+=(--add-data "$ENV_PATH${ADD_DATA_SEP}.")
+elif [[ -f "$ENV_EXAMPLE_PATH" ]]; then
+  ADD_DATA_ARGS+=(--add-data "$ENV_EXAMPLE_PATH${ADD_DATA_SEP}.")
+else
+  echo "Warning: no .env or .env.server.example found, using runtime defaults"
 fi
 if [[ "$OSTYPE" == "darwin"* ]]; then
   python -m PyInstaller --noconfirm --clean --windowed --name NeuroGame \

@@ -14,14 +14,17 @@ def load_env_defaults() -> None:
 def _candidate_env_paths() -> list[Path]:
     paths: list[Path] = []
     seen: set[str] = set()
-    candidates = [
-        Path.cwd() / ".env",
-        Path(sys.executable).resolve().parent / ".env",
-        Path(__file__).resolve().parents[2] / ".env",
+    env_names = (".env", ".env.server.example")
+    base_dirs = [
+        Path.cwd(),
+        Path(sys.executable).resolve().parent,
+        Path(__file__).resolve().parents[2],
     ]
+    candidates = [base / name for base in base_dirs for name in env_names]
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
-        candidates.append(Path(meipass) / ".env")
+        for name in env_names:
+            candidates.append(Path(meipass) / name)
     for item in candidates:
         key = str(item)
         if key in seen:
