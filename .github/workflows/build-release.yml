@@ -28,8 +28,8 @@ jobs:
           BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
           BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
           BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        shell: python
         run: |
-          python - <<'PY'
           import os
           from pathlib import Path
 
@@ -47,7 +47,6 @@ jobs:
               ]
           ) + "\n"
           Path(".env").write_text(payload, encoding="utf-8")
-          PY
 
       - name: Build executable
         env:
@@ -84,8 +83,8 @@ jobs:
           BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
           BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
           BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        shell: python
         run: |
-          python - <<'PY'
           import os
           from pathlib import Path
 
@@ -103,7 +102,6 @@ jobs:
               ]
           ) + "\n"
           Path(".env").write_text(payload, encoding="utf-8")
-          PY
 
       - name: Build executable
         run: python packaging/build_desktop.py
@@ -143,8 +141,8 @@ jobs:
           BUILD_API_KEY: ${{ secrets.NEUROGAME_API_KEY }}
           BUILD_TELEMETRY_URL: ${{ vars.NEUROGAME_TELEMETRY_URL }}
           BUILD_DEFAULT_TELEMETRY_URL: ${{ vars.NEUROGAME_DEFAULT_TELEMETRY_URL }}
+        shell: python
         run: |
-          python - <<'PY'
           import os
           from pathlib import Path
 
@@ -162,7 +160,6 @@ jobs:
               ]
           ) + "\n"
           Path(".env").write_text(payload, encoding="utf-8")
-          PY
 
       - name: Build executable
         env:
