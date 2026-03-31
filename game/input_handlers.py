@@ -54,6 +54,9 @@ def handle_auth_mouse(app, pos: tuple[int, int]) -> None:
 
 
 def handle_menu_mouse(app, pos: tuple[int, int]) -> None:
+    if app.instructions_button_rect and app.instructions_button_rect.collidepoint(pos):
+        app._open_instructions()
+        return
     if app.telemetry_url_rect and app.telemetry_url_rect.collidepoint(pos):
         app.telemetry_input_focused = True
         return
@@ -72,18 +75,33 @@ def handle_menu_mouse(app, pos: tuple[int, int]) -> None:
         return
     if app.resume_button_rect and app.resume_button_rect.collidepoint(pos):
         if not app.awaiting_run_setup:
-            app.started = True
+            if app.instructions_completed:
+                app.started = True
+            else:
+                app._open_instructions(launch_action="continue_active")
             return
-        if app.awaiting_run_setup and app._restore_saved_run():
+        if app.awaiting_run_setup and app._has_saved_run_for_user():
+            if app.instructions_completed:
+                app._restore_saved_run()
+            else:
+                app._open_instructions(launch_action="resume_saved")
             return
         level = int(app.user_progress.get("last_level", 1))
-        app._begin_user_run(max(1, level))
+        if app.instructions_completed:
+            app._begin_user_run(max(1, level))
+        else:
+            app._open_instructions(launch_action="resume_level")
         return
     if app.restart_button_rect and app.restart_button_rect.collidepoint(pos):
-        app._begin_user_run(1)
+        if app.instructions_completed:
+            app._begin_user_run(1)
+        else:
+            app._open_instructions(launch_action="start_new")
         return
     if app.start_button_rect and app.start_button_rect.collidepoint(pos):
-        if app.awaiting_run_setup:
+        if not app.instructions_completed:
+            app._open_instructions(launch_action="start_new")
+        elif app.awaiting_run_setup:
             app._begin_user_run(1)
         else:
             app.started = True
@@ -111,11 +129,11 @@ def handle_pause_menu_mouse(app, pos: tuple[int, int]) -> None:
             event_type="session_resume",
             user_id=app.user_id,
             session_id=app.session_id,
-            model_version=f"{app.selected_mode}_v1",
+            model_version=app._model_version(),
             payload={
                 "session_id": app.session_id,
                 "user_id": app.user_id,
-                "mode": app.selected_mode,
+                "mode": app._effective_mode(),
                 "source": "pause_menu_button",
             },
         )

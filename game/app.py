@@ -131,6 +131,9 @@ class GameApp:
         self.batch_index: int = 1
         self.planets_visited: int = 0
         self.selected_mode = self.session.adaptation_mode
+        # TEMP: for the second testing phase we route both UI modes to the model policy.
+        # The toggle remains visible for users, but the effective runtime mode is forced to PPO.
+        self.force_model_mode: bool = True
         self.auth_store = UserAuthStore(
             str(self.users_path),
             endpoint_url=self.telemetry_url_value,
@@ -188,7 +191,16 @@ class GameApp:
         self.awaiting_run_setup: bool = True
         self.pause_between_levels: bool = True
         self.level_transition_toggle_rect: pygame.Rect | None = None
+        self.instructions_button_rect: pygame.Rect | None = None
+        self.instructions_start_rect: pygame.Rect | None = None
+        self.instructions_close_rect: pygame.Rect | None = None
+        self.max_level_continue_rect: pygame.Rect | None = None
+        self.max_level_menu_rect: pygame.Rect | None = None
         self.pause_menu_open: bool = False
+        self.instructions_open: bool = False
+        self.instructions_completed: bool = False
+        self.instructions_launch_action: str | None = None
+        self.max_level_popup_open: bool = False
         self.persist_active_run_on_exit: bool = False
         self.partial_session_end_emitted: bool = False
         self.saved_run_preview_stats: Dict[str, float] | None = None
@@ -230,7 +242,11 @@ class GameApp:
                         self.persist_active_run_on_exit = True
                     self.running = False
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    if self.started:
+                    if self.instructions_open:
+                        self._close_instructions()
+                    elif self.max_level_popup_open:
+                        self._continue_after_max_level_popup()
+                    elif self.started:
                         self._pause_run(open_pause_menu=True)
                     elif self.pause_menu_open:
                         self.started = True
@@ -239,11 +255,11 @@ class GameApp:
                             event_type="session_resume",
                             user_id=self.user_id,
                             session_id=self.session_id,
-                            model_version=f"{self.selected_mode}_v1",
+                            model_version=self._model_version(),
                             payload={
                                 "session_id": self.session_id,
                                 "user_id": self.user_id,
-                                "mode": self.selected_mode,
+                                "mode": self._effective_mode(),
                                 "source": "escape",
                             },
                         )
@@ -253,6 +269,20 @@ class GameApp:
                     if result is not None:
                         self._handle_result(result)
                 else:
+                    if self.max_level_popup_open:
+                        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            self._continue_after_max_level_popup()
+                            continue
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            self._handle_max_level_popup_mouse(event.pos)
+                        continue
+                    if self.instructions_open:
+                        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            self._complete_instructions()
+                            continue
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            self._handle_instructions_mouse(event.pos)
+                        continue
                     if not self.authenticated:
                         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                             self._handle_auth_mouse(event.pos)
@@ -262,12 +292,24 @@ class GameApp:
                             continue
                         if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
                             if self.awaiting_run_setup:
-                                if self._restore_saved_run():
-                                    continue
+                                if self._has_saved_run_for_user():
+                                    if self.instructions_completed:
+                                        if self._restore_saved_run():
+                                            continue
+                                    else:
+                                        self._open_instructions(launch_action="resume_saved")
+                                        continue
                                 start_level = int(self.user_progress.get("last_level", 1)) if self.user_progress.get("sessions", 0) > 0 else 1
+                                if not self.instructions_completed:
+                                    launch_action = "resume_level" if self.user_progress.get("sessions", 0) > 0 else "start_new"
+                                    self._open_instructions(launch_action=launch_action)
+                                    continue
                                 self._begin_user_run(max(1, start_level))
                             else:
-                                self.started = True
+                                if self.instructions_completed:
+                                    self.started = True
+                                else:
+                                    self._open_instructions(launch_action="continue_active")
                         if event.type == pygame.KEYDOWN and (
                             event.key in (pygame.K_b, pygame.K_r) or (event.unicode or "").lower() in ("в", "r")
                         ):
@@ -333,7 +375,7 @@ class GameApp:
             "adapt_state": self.last_adapt_state,
             "adapt_action": self.last_adapt_action,
             "adapt_reward": self.last_adapt_reward,
-            "mode": self.selected_mode,
+            "mode": self._effective_mode(),
             "payload": result.payload,
             "response": result.response,
             "correct": int(result.correct),
@@ -345,7 +387,7 @@ class GameApp:
             event_type="task_result",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload=event_record,
         )
         if result.correct:
@@ -369,8 +411,8 @@ class GameApp:
         prev_level = self.current_level
         prev_tempo = self.tempo_offset
 
-        effective_mode = self.selected_mode
-        if self.selected_mode == "ppo" and self._rl_model_exists():
+        effective_mode = self._effective_mode()
+        if effective_mode == "ppo" and self._rl_model_exists():
             _, _, delta_tempo = self.rl_agent.act(state)
             new_level = prev_level
             new_tempo = self._clamp_tempo_for_level(prev_tempo + delta_tempo, prev_level)
@@ -466,11 +508,16 @@ class GameApp:
             self._render_task_panels(focused)
             self._render_feedback(now_ms)
         else:
-            if self.pause_menu_open:
+            if self.max_level_popup_open:
+                self._render_paused_scene()
+                self._render_max_level_popup()
+            elif self.pause_menu_open:
                 self._render_paused_scene()
                 self._render_pause_menu()
             else:
                 self._render_start_screen()
+            if self.instructions_open:
+                self._render_instructions_overlay()
 
         pygame.display.flip()
 
@@ -535,6 +582,9 @@ class GameApp:
         self.menu_button_rect = None
         self.mode_toggle_rect = None
         self.level_transition_toggle_rect = None
+        self.instructions_button_rect = None
+        self.max_level_continue_rect = None
+        self.max_level_menu_rect = None
 
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         overlay.fill((6, 8, 14, 220))
@@ -563,6 +613,59 @@ class GameApp:
         self.ui.draw_button(self.exit_button_rect, "Выход из приложения", active=False)
         hint = self.ui.font_tiny.render("Esc - продолжить", True, self.ui.theme.text)
         self.screen.blit(hint, (card.x + 20, card.bottom - 30))
+
+    def _render_max_level_popup(self) -> None:
+        self.start_button_rect = None
+        self.resume_button_rect = None
+        self.restart_button_rect = None
+        self.menu_button_rect = None
+        self.mode_toggle_rect = None
+        self.level_transition_toggle_rect = None
+        self.instructions_button_rect = None
+
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((6, 8, 14, 228))
+        self.screen.blit(overlay, (0, 0))
+
+        card_w = min(760, self.ui.w - 80)
+        card_h = min(420, self.ui.h - 80)
+        card = pygame.Rect(0, 0, card_w, card_h)
+        card.center = (self.ui.w // 2, self.ui.h // 2)
+        pygame.draw.rect(self.screen, (20, 28, 44), card, border_radius=16)
+        pygame.draw.rect(self.screen, self.ui.theme.accent, card, width=2, border_radius=16)
+
+        title = self.ui.font_mid.render("Максимальный уровень", True, self.ui.theme.accent)
+        title_rect = title.get_rect(center=(card.centerx, card.y + 38))
+        self.screen.blit(title, title_rect)
+
+        body_lines = [
+            "Ура! Вы достигли максимального уровня, поздравляем!",
+            "",
+            "Продолжайте играть как можно больше,",
+            "чтобы тренировать ваши когнитивные способности",
+            "(и чтобы Лера набрала классы на дипломе).",
+            "",
+            "Когда закончите игру - не забудьте закрыть приложение.",
+            "Ищите себя в лидерборде.",
+        ]
+        line_h = self.ui.font_small.get_height() + 8
+        body_top = card.y + 86
+        for idx, line in enumerate(body_lines):
+            if not line:
+                continue
+            surf = self.ui.font_small.render(line, True, self.ui.theme.text)
+            surf_rect = surf.get_rect(center=(card.centerx, body_top + idx * line_h))
+            self.screen.blit(surf, surf_rect)
+
+        btn_w = (card.width - 58) // 2
+        btn_y = card.bottom - 72
+        self.max_level_continue_rect = pygame.Rect(card.x + 24, btn_y, btn_w, 42)
+        self.max_level_menu_rect = pygame.Rect(self.max_level_continue_rect.right + 10, btn_y, btn_w, 42)
+        self.ui.draw_button(self.max_level_continue_rect, "Продолжить играть", active=True)
+        self.ui.draw_button(self.max_level_menu_rect, "В главное меню", active=False)
+
+        hint = self.ui.font_tiny.render("Enter / Space / Esc - продолжить", True, self.ui.theme.text)
+        self.screen.blit(hint, (card.x + 24, card.bottom - 28))
 
     def _dim_panel(self, rect: pygame.Rect) -> None:
         overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
@@ -593,10 +696,15 @@ class GameApp:
         self.exit_button_rect = None
         self.mode_toggle_rect = None
         self.level_transition_toggle_rect = None
+        self.instructions_button_rect = None
         self.logout_button_rect = None
         self.telemetry_url_rect = None
         self.telemetry_save_rect = None
         self.telemetry_check_rect = None
+        self.instructions_start_rect = None
+        self.instructions_close_rect = None
+        self.max_level_continue_rect = None
+        self.max_level_menu_rect = None
 
         full = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         full.fill((6, 8, 14, 220))
@@ -635,15 +743,12 @@ class GameApp:
         center_w = self.ui.w - margin * 2 - col_gap * 2 - left_w - right_w
         top_row_h = int(main_height * 0.38)
         top_row_h = max(220, min(top_row_h, 300))
-        bottom_row_h = main_height - top_row_h - row_gap
-        telemetry_h = max(110, min(170, int(main_height * 0.24)))
-        profile_h = max(120, bottom_row_h - telemetry_h - row_gap)
+        profile_h = max(180, main_height - top_row_h - row_gap)
 
         left_box = pygame.Rect(margin, main_top, left_w, top_row_h)
         center_box = pygame.Rect(left_box.right + col_gap, main_top, center_w, top_row_h)
         right_top_box = pygame.Rect(center_box.right + col_gap, main_top, right_w, top_row_h)
         profile_box = pygame.Rect(margin, main_top + top_row_h + row_gap, self.ui.w - margin * 2, profile_h)
-        telemetry_top = profile_box.bottom + row_gap
 
         for rect in [center_box, left_box, right_top_box, profile_box]:
             pygame.draw.rect(self.screen, self.ui.theme.panel, rect, border_radius=12)
@@ -699,19 +804,27 @@ class GameApp:
         self.screen.blit(mode_title, (right_top_box.x + 16, right_top_box.y + 16))
         mode_label = "Базовый" if self.selected_mode == "baseline" else "Адаптивный"
         mode_value = self.ui.font_mid.render(mode_label, True, self.ui.theme.text)
-        self.screen.blit(mode_value, (right_top_box.x + 16, right_top_box.y + 50))
-        self.mode_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 112, right_top_box.width - 32, 30)
+        self.screen.blit(mode_value, (right_top_box.x + 16, right_top_box.y + 46))
+        self.mode_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 96, right_top_box.width - 32, 28)
         self._draw_compact_button(self.mode_toggle_rect, "Сменить режим", active=False)
         transition_label = "Переход: Пауза" if self.pause_between_levels else "Переход: Авто"
-        transition_state = self.ui.font_mid.render(transition_label, True, self.ui.theme.text)
-        self.screen.blit(transition_state, (right_top_box.x + 16, right_top_box.y + 146))
-        self.level_transition_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 188, right_top_box.width - 32, 30)
+        transition_state = self.ui.font_small.render(transition_label, True, self.ui.theme.text)
+        self.screen.blit(transition_state, (right_top_box.x + 16, right_top_box.y + 134))
+        self.level_transition_toggle_rect = pygame.Rect(right_top_box.x + 16, right_top_box.y + 170, right_top_box.width - 32, 28)
         self._draw_compact_button(self.level_transition_toggle_rect, "Переключить переход", active=False)
+        self.instructions_button_rect = pygame.Rect(
+            right_top_box.x + 16,
+            right_top_box.bottom - 44,
+            right_top_box.width - 32,
+            28,
+        )
+        self._draw_compact_button(self.instructions_button_rect, "Инструкция", active=False)
 
         warning = self._rl_warning()
         if warning:
+            warning_y = self.instructions_button_rect.y - self.ui.font_tiny.get_height() - 8
             warning_surf = self.ui.font_tiny.render(warning, True, self.ui.theme.alert)
-            self.screen.blit(warning_surf, (right_top_box.x + 16, right_top_box.bottom - 28))
+            self.screen.blit(warning_surf, (right_top_box.x + 16, warning_y))
 
         profile_title = self.ui.font_small.render("Профиль", True, self.ui.theme.accent)
         self.screen.blit(profile_title, (profile_box.x + 16, profile_box.y + 16))
@@ -738,7 +851,118 @@ class GameApp:
                 self.ui.theme.text,
                 line_h=21,
             )
-        self._render_telemetry_panel(telemetry_top, telemetry_h)
+
+    def _render_instructions_overlay(self) -> None:
+        self.instructions_start_rect = None
+        self.instructions_close_rect = None
+
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((4, 6, 12, 235))
+        self.screen.blit(overlay, (0, 0))
+
+        card_w = min(960, self.ui.w - 80)
+        card_h = min(700, self.ui.h - 80)
+        card = pygame.Rect(0, 0, card_w, card_h)
+        card.center = (self.ui.w // 2, self.ui.h // 2)
+        pygame.draw.rect(self.screen, (17, 24, 40), card, border_radius=16)
+        pygame.draw.rect(self.screen, self.ui.theme.accent, card, width=2, border_radius=16)
+
+        title = self.ui.font_big.render("Как играть", True, self.ui.theme.accent)
+        self.screen.blit(title, (card.x + 24, card.y + 20))
+
+        subtitle = "Сначала посмотри, что значит каждая кнопка. Потом нажми Начать."
+        subtitle_y = self._draw_wrapped_text(
+            subtitle,
+            card.x + 24,
+            card.y + 70,
+            card.width - 48,
+            self.ui.font_small,
+            self.ui.theme.text,
+            line_h=self.ui.font_small.get_height() + 4,
+        )
+
+        step_gap = 18
+        section_gap = 10
+        left_col_x = card.x + 24
+        col_w = (card.width - 72) // 2
+        right_col_x = left_col_x + col_w + 24
+        content_top = subtitle_y + 10
+
+        left_box = pygame.Rect(left_col_x, content_top, col_w, card.height - 190)
+        right_box = pygame.Rect(right_col_x, content_top, col_w, card.height - 190)
+        for rect in (left_box, right_box):
+            pygame.draw.rect(self.screen, (12, 17, 30), rect, border_radius=12)
+            pygame.draw.rect(self.screen, self.ui.theme.border, rect, width=1, border_radius=12)
+
+        header_1 = self.ui.font_mid.render("Шаги", True, self.ui.theme.accent)
+        self.screen.blit(header_1, (left_box.x + 16, left_box.y + 14))
+        steps = [
+            "1. Посмотри на задание в активной панели справа.",
+            "2. Реши, верно ли утверждение или есть ли цель в сигнале.",
+            "3. Нажми F для ответа ДА.",
+            "4. Нажми J для ответа НЕТ.",
+            "5. Действуй быстро: таймер идет, а между этапами будет пауза.",
+        ]
+        yy = left_box.y + 52
+        for step in steps:
+            yy = self._draw_wrapped_text(
+                step,
+                left_box.x + 16,
+                yy,
+                left_box.width - 32,
+                self.ui.font_small,
+                self.ui.theme.text,
+                line_h=self.ui.font_small.get_height() + 4,
+            )
+            yy += section_gap
+
+        header_2 = self.ui.font_mid.render("Куда нажимать", True, self.ui.theme.accent)
+        self.screen.blit(header_2, (right_box.x + 16, right_box.y + 14))
+        self._draw_direction_arrow(
+            start=(right_box.x + 42, right_box.y + 96),
+            end=(right_box.centerx - 40, right_box.y + 96),
+            color=self.ui.theme.accent,
+            points_left=True,
+        )
+        self._draw_direction_arrow(
+            start=(right_box.centerx + 40, right_box.y + 96),
+            end=(right_box.right - 42, right_box.y + 96),
+            color=self.ui.theme.alert,
+            points_left=False,
+        )
+        left_key = self.ui.font_huge.render("F", True, self.ui.theme.accent)
+        right_key = self.ui.font_huge.render("J", True, self.ui.theme.alert)
+        self.screen.blit(left_key, left_key.get_rect(center=(right_box.x + 86, right_box.y + 148)))
+        self.screen.blit(right_key, right_key.get_rect(center=(right_box.right - 86, right_box.y + 148)))
+
+        mappings = [
+            "F - Да: совпадает, есть метка, верно.",
+            "J - Нет: не совпадает, метки нет, неверно.",
+            "Esc - Пауза во время сессии.",
+            "Смотри на активную карточку: остальные панели только фон.",
+        ]
+        yy = right_box.y + 220
+        for line in mappings:
+            yy = self._draw_wrapped_text(
+                line,
+                right_box.x + 16,
+                yy,
+                right_box.width - 32,
+                self.ui.font_small,
+                self.ui.theme.text,
+                line_h=self.ui.font_small.get_height() + 4,
+            )
+            yy += section_gap
+
+        footer_y = card.bottom - 72
+        button_w = max(220, min(320, (card.width - 72) // 2))
+        self.instructions_start_rect = pygame.Rect(card.x + 24, footer_y, button_w, 42)
+        self.instructions_close_rect = pygame.Rect(card.right - 24 - button_w, footer_y, button_w, 42)
+        self.ui.draw_button(self.instructions_start_rect, "Понятно, начать", active=True)
+        self.ui.draw_button(self.instructions_close_rect, "Закрыть и вернуться", active=False)
+
+        hint = self.ui.font_tiny.render("Enter или Space - начать, Esc - закрыть", True, self.ui.theme.text)
+        self.screen.blit(hint, (card.x + 24, card.bottom - 28))
 
     def _render_telemetry_panel(self, top_y: int, preferred_h: int) -> None:
         safe_top = min(top_y, self.ui.h - 100)
@@ -934,15 +1158,70 @@ class GameApp:
         box = pygame.Rect(box_x, rect.y + 52, max(180, box_w), rect.height - 88)
         pygame.draw.rect(self.screen, (14, 18, 32), box, border_radius=10)
         pygame.draw.rect(self.screen, self.ui.theme.border, box, width=1, border_radius=10)
-        self._draw_wrapped_text(
-            phrase,
-            box.x + 10,
-            box.y + 12,
-            box.width - 20,
-            self.ui.font_tiny,
-            self.ui.theme.accent,
-            line_h=20,
+        self._draw_fitted_quote(
+            text=phrase,
+            rect=pygame.Rect(box.x + 10, box.y + 12, box.width - 20, box.height - 24),
+            color=self.ui.theme.accent,
         )
+
+    def _draw_fitted_quote(
+        self,
+        text: str,
+        rect: pygame.Rect,
+        color: tuple[int, int, int],
+    ) -> None:
+        if not text.strip():
+            return
+
+        max_size = max(18, int(self.ui.font_small.get_height() * 1.15))
+        min_size = max(12, int(self.ui.font_tiny.get_height() * 0.95))
+
+        for size in range(max_size, min_size - 1, -1):
+            font = self.ui._make_font(size, bold=True)
+            line_h = font.get_height() + 4
+            lines = self._wrap_text_for_font(text, font, rect.width)
+            total_h = len(lines) * line_h
+            if total_h <= rect.height:
+                yy = rect.y + max(0, (rect.height - total_h) // 2)
+                for line in lines:
+                    surf = font.render(line, True, color)
+                    self.screen.blit(surf, (rect.x, yy))
+                    yy += line_h
+                return
+
+        fallback = self.ui._make_font(min_size, bold=True)
+        lines = self._wrap_text_for_font(text, fallback, rect.width)
+        line_h = fallback.get_height() + 2
+        max_lines = max(1, rect.height // line_h)
+        clipped = lines[:max_lines]
+        if clipped and len(lines) > max_lines:
+            last = clipped[-1]
+            while len(last) > 3 and fallback.size(last + "...")[0] > rect.width:
+                last = last[:-1]
+            clipped[-1] = last + "..."
+        yy = rect.y
+        for line in clipped:
+            surf = fallback.render(line, True, color)
+            self.screen.blit(surf, (rect.x, yy))
+            yy += line_h
+
+    @staticmethod
+    def _wrap_text_for_font(text: str, font: pygame.font.Font, max_width: int) -> List[str]:
+        words = text.split()
+        if not words:
+            return [""]
+        lines: List[str] = []
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if not current or font.size(candidate)[0] <= max_width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines
 
     def _roll_motivation_phrase(self) -> None:
         if not self.motivation_phrases:
@@ -972,6 +1251,30 @@ class GameApp:
         text_rect = text.get_rect(center=rect.center)
         self.screen.blit(text, text_rect)
 
+    def _draw_direction_arrow(
+        self,
+        start: tuple[int, int],
+        end: tuple[int, int],
+        color: tuple[int, int, int],
+        points_left: bool,
+    ) -> None:
+        pygame.draw.line(self.screen, color, start, end, 4)
+        head = 12
+        tip = start if points_left else end
+        if points_left:
+            points = [
+                tip,
+                (tip[0] + head, tip[1] - head // 2),
+                (tip[0] + head, tip[1] + head // 2),
+            ]
+        else:
+            points = [
+                tip,
+                (tip[0] - head, tip[1] - head // 2),
+                (tip[0] - head, tip[1] + head // 2),
+            ]
+        pygame.draw.polygon(self.screen, color, points)
+
     def _handle_runtime_error(self, stage: str, exc: Exception) -> None:
         self.last_feedback_text = "Ошибка рендера. Проверь лог client_errors.log"
         self.last_feedback_ok = False
@@ -997,6 +1300,22 @@ class GameApp:
 
     def _handle_pause_menu_mouse(self, pos: tuple[int, int]) -> None:
         handle_pause_menu_mouse(self, pos)
+
+    def _handle_instructions_mouse(self, pos: tuple[int, int]) -> None:
+        if self.instructions_start_rect and self.instructions_start_rect.collidepoint(pos):
+            self._complete_instructions()
+            return
+        if self.instructions_close_rect and self.instructions_close_rect.collidepoint(pos):
+            self._close_instructions()
+            return
+
+    def _handle_max_level_popup_mouse(self, pos: tuple[int, int]) -> None:
+        if self.max_level_continue_rect and self.max_level_continue_rect.collidepoint(pos):
+            self._continue_after_max_level_popup()
+            return
+        if self.max_level_menu_rect and self.max_level_menu_rect.collidepoint(pos):
+            self._return_to_menu_after_max_level_popup()
+            return
 
     def _submit_auth(self) -> None:
         username = self.auth_username.strip()
@@ -1091,11 +1410,11 @@ class GameApp:
             event_type="session_pause",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload={
                 "session_id": self.session_id,
                 "user_id": self.user_id,
-                "mode": self.selected_mode,
+                "mode": self._effective_mode(),
                 "reason": "pause_menu" if open_pause_menu else "menu",
             },
         )
@@ -1136,7 +1455,7 @@ class GameApp:
             "max_level": self.current_level,
             "last_level": self.current_level,
             "planets_visited": self.planets_visited,
-            "mode": self.selected_mode,
+            "mode": self._effective_mode(),
             "is_partial": 1,
             "exit_reason": reason,
             "task_offsets": dict(self.task_offsets),
@@ -1145,7 +1464,7 @@ class GameApp:
             event_type="session_end_partial",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload=payload,
         )
         self.partial_session_end_emitted = True
@@ -1278,11 +1597,11 @@ class GameApp:
             event_type="session_resume",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload={
                 "session_id": self.session_id,
                 "user_id": self.user_id,
-                "mode": self.selected_mode,
+                "mode": self._effective_mode(),
                 "level": self.current_level,
                 "tempo_offset": self.tempo_offset,
                 "batch_index": self.batch_index,
@@ -1328,16 +1647,59 @@ class GameApp:
             event_type="session_start",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload={
                 "session_id": self.session_id,
                 "user_id": self.user_id,
-                "mode": self.selected_mode,
+                "mode": self._effective_mode(),
                 "level": self.current_level,
                 "tempo_offset": self.tempo_offset,
             },
         )
         self._roll_motivation_phrase()
+
+    def _open_instructions(self, launch_action: str | None = None) -> None:
+        self.instructions_open = True
+        self.instructions_launch_action = launch_action
+        self.started = False
+        self.pause_menu_open = False
+
+    def _close_instructions(self) -> None:
+        self.instructions_open = False
+        self.instructions_launch_action = None
+
+    def _complete_instructions(self) -> None:
+        launch_action = self.instructions_launch_action
+        self.instructions_completed = True
+        self.instructions_open = False
+        self.instructions_launch_action = None
+        if launch_action == "start_new":
+            self._begin_user_run(1)
+        elif launch_action == "resume_saved":
+            if not self._restore_saved_run():
+                level = int(self.user_progress.get("last_level", 1))
+                self._begin_user_run(max(1, level))
+        elif launch_action == "resume_level":
+            level = int(self.user_progress.get("last_level", 1))
+            self._begin_user_run(max(1, level))
+        elif launch_action == "continue_active":
+            self.started = True
+
+    def _open_max_level_popup(self) -> None:
+        self.max_level_popup_open = True
+        self.started = False
+        self.pause_menu_open = False
+
+    def _continue_after_max_level_popup(self) -> None:
+        self.max_level_popup_open = False
+        self.started = True
+        self.pause_menu_open = False
+
+    def _return_to_menu_after_max_level_popup(self) -> None:
+        self.max_level_popup_open = False
+        self.started = False
+        self.pause_menu_open = False
+        self._save_active_run_snapshot()
 
     def _logout_user(self) -> None:
         if self._has_resumable_run():
@@ -1678,6 +2040,14 @@ class GameApp:
             return ""
         return "Агент не доступен, смена невозможна"
 
+    def _effective_mode(self) -> str:
+        if self.force_model_mode and self._rl_model_exists():
+            return "ppo"
+        return self.selected_mode
+
+    def _model_version(self) -> str:
+        return f"{self._effective_mode()}_v1"
+
     def _resolve_resource_path(self, rel_path: str) -> Path:
         path = Path(rel_path)
         if path.is_absolute() and path.exists():
@@ -1767,7 +2137,7 @@ class GameApp:
             event_type="session_end",
             user_id=self.user_id,
             session_id=self.session_id,
-            model_version=f"{self.selected_mode}_v1",
+            model_version=self._model_version(),
             payload=record,
         )
         self.telemetry.flush(force=True)
@@ -1867,7 +2237,8 @@ class GameApp:
         answer_rate = answered / max(1, self.session.total_tasks)
         answer_accuracy = (correct / answered) if answered > 0 else 0.0
 
-        if self.selected_mode == "baseline":
+        effective_mode = self._effective_mode()
+        if effective_mode == "baseline":
             need = min(self.session.total_tasks, self.level_cfg.baseline_required_correct)
             level_up = correct >= need
             level_down = False
@@ -1882,7 +2253,7 @@ class GameApp:
             if self.current_level < self.level_cfg.max_level:
                 self.current_level += 1
                 did_level_up = True
-            elif self.selected_mode != "baseline":
+            elif effective_mode != "baseline":
                 self.tempo_offset = self._clamp_tempo_for_level(self.tempo_offset + 1, self.current_level)
             if did_level_up:
                 self.planets_visited += 1
@@ -1890,13 +2261,13 @@ class GameApp:
                 self.last_feedback_text = (
                     f"Ура, новый уровень! {correct}/{self.session.total_tasks} • Теперь: {self.current_level}"
                 )
-            elif self.selected_mode != "baseline":
+            elif effective_mode != "baseline":
                 self.last_feedback_text = (
-                    f"Уровень максимальный. {correct}/{self.session.total_tasks} • Темп повышен."
+                    f"Уровень максимальный. Результат: {correct}/{self.session.total_tasks}."
                 )
             else:
                 self.last_feedback_text = (
-                    f"Максимальный уровень {self.current_level}. Результат {correct}/{self.session.total_tasks}."
+                    f"Максимальный уровень {self.current_level}. Результат: {correct}/{self.session.total_tasks}."
                 )
         elif level_down:
             self.current_level = max(self.level_cfg.min_level, self.current_level - 1)
@@ -1925,7 +2296,10 @@ class GameApp:
         self.last_feedback_duration_ms = 2200
         self.last_feedback_ok = True
         self._roll_motivation_phrase()
-        if self.pause_between_levels and completed_stage_successfully:
+        if completed_stage_successfully and self.current_level >= self.level_cfg.max_level:
+            self.last_feedback_text = ""
+            self._open_max_level_popup()
+        elif self.pause_between_levels and completed_stage_successfully:
             # После успешного этапа даем паузу даже на максимальном уровне,
             # иначе после достижения потолка сложности игра неожиданно идет без остановки.
             self.started = False
