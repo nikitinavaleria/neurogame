@@ -4,7 +4,7 @@ from typing import List
 import pygame
 
 from game.runtime.models import TaskSpec
-from game.tasks.base import TaskBase, TaskRenderContext
+from game.tasks.base import TaskBase, TaskRenderContext, render_fitted_text
 from game.tasks.input_utils import read_left_right_key
 
 
@@ -41,10 +41,16 @@ class SequenceMemoryTask(TaskBase):
         x = ctx.rect.x + 16
         y = ctx.rect.y + 30
         max_h = ctx.rect.height - 44
+        max_text_width = ctx.rect.width - 32
         now_ms = pygame.time.get_ticks()
         if now_ms < self.show_until_ms:
             seq = " ".join(self.sequence)
-            surf = ctx.font_big.render(seq, True, ctx.color_main)
+            surf = render_fitted_text(
+                seq,
+                ctx.color_main,
+                [ctx.font_big, ctx.font_mid, ctx.font_small],
+                max_text_width,
+            )
             screen.blit(surf, (x, y + min(64, max_h // 3)))
             hint_text = "Запомни последовательность"
             if ctx.font_small.size(hint_text)[0] > ctx.rect.width - 32:
@@ -57,7 +63,12 @@ class SequenceMemoryTask(TaskBase):
             return
 
         question = f"Был ли '{self.query_symbol}'?"
-        surf = ctx.font_mid.render(question, True, ctx.color_main)
+        surf = render_fitted_text(
+            question,
+            ctx.color_main,
+            [ctx.font_mid, ctx.font_small],
+            max_text_width,
+        )
         screen.blit(surf, (x, y + min(64, max_h // 3)))
         hint = ctx.font_small.render("F - да, J - нет", True, ctx.color_main)
         screen.blit(hint, (x, y + max_h - 22))

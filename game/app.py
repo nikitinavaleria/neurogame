@@ -1876,7 +1876,9 @@ class GameApp:
             level_down = answer_rate < 0.5 or answer_accuracy < 0.55
 
         did_level_up = False
+        completed_stage_successfully = False
         if level_up:
+            completed_stage_successfully = True
             if self.current_level < self.level_cfg.max_level:
                 self.current_level += 1
                 did_level_up = True
@@ -1923,8 +1925,9 @@ class GameApp:
         self.last_feedback_duration_ms = 2200
         self.last_feedback_ok = True
         self._roll_motivation_phrase()
-        if self.pause_between_levels and did_level_up:
-            # Пауза между этапами нужна только при реальном переходе на новый уровень.
+        if self.pause_between_levels and completed_stage_successfully:
+            # После успешного этапа даем паузу даже на максимальном уровне,
+            # иначе после достижения потолка сложности игра неожиданно идет без остановки.
             self.started = False
             self.pause_menu_open = False
         self._save_active_run_snapshot()

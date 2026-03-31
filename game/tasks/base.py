@@ -62,3 +62,47 @@ class TaskBase:
             difficulty=self.spec.difficulty,
             payload=self.spec.payload,
         )
+
+
+def render_fitted_text(
+    text: str,
+    color: Tuple[int, int, int],
+    fonts: list[pygame.font.Font],
+    max_width: int,
+) -> pygame.Surface:
+    safe_width = max(24, int(max_width))
+    for font in fonts:
+        if font.size(text)[0] <= safe_width:
+            return font.render(text, True, color)
+
+    fallback = fonts[-1]
+    clipped = text
+    while len(clipped) > 1 and fallback.size(clipped + "...")[0] > safe_width:
+        clipped = clipped[:-1]
+    if clipped != text:
+        clipped = clipped + "..."
+    return fallback.render(clipped, True, color)
+
+
+def wrap_text(
+    text: str,
+    font: pygame.font.Font,
+    max_width: int,
+) -> list[str]:
+    words = text.split()
+    if not words:
+        return [""]
+
+    lines: list[str] = []
+    current = ""
+    safe_width = max(24, int(max_width))
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if not current or font.size(candidate)[0] <= safe_width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+    if current:
+        lines.append(current)
+    return lines

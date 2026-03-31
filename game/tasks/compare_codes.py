@@ -4,7 +4,7 @@ from typing import Tuple
 import pygame
 
 from game.runtime.models import TaskSpec
-from game.tasks.base import TaskBase, TaskRenderContext
+from game.tasks.base import TaskBase, TaskRenderContext, render_fitted_text
 from game.tasks.input_utils import read_left_right_key
 
 
@@ -46,8 +46,19 @@ class CompareCodesTask(TaskBase):
         x = ctx.rect.x + 16
         y = ctx.rect.y + 30
         max_h = ctx.rect.height - 44
-        code_a = ctx.font_big.render(self.code_a, True, ctx.color_main)
-        code_b = ctx.font_big.render(self.code_b, True, ctx.color_main)
+        max_text_width = ctx.rect.width - 32
+        code_a = render_fitted_text(
+            self.code_a,
+            ctx.color_main,
+            [ctx.font_big, ctx.font_mid, ctx.font_small],
+            max_text_width,
+        )
+        code_b = render_fitted_text(
+            self.code_b,
+            ctx.color_main,
+            [ctx.font_big, ctx.font_mid, ctx.font_small],
+            max_text_width,
+        )
         spacing = min(54, max(30, max_h // 5))
         screen.blit(code_a, (x, y + spacing))
         screen.blit(code_b, (x, y + spacing * 2))

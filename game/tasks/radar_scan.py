@@ -3,7 +3,7 @@ import random
 import pygame
 
 from game.runtime.models import TaskSpec
-from game.tasks.base import TaskBase, TaskRenderContext
+from game.tasks.base import TaskBase, TaskRenderContext, render_fitted_text, wrap_text
 from game.tasks.input_utils import read_left_right_key
 
 
@@ -45,21 +45,39 @@ class RadarScanTask(TaskBase):
         x = ctx.rect.x + 16
         y = ctx.rect.y + 30
         bottom_y = ctx.rect.bottom - 24
-        title = ctx.font_mid.render("Есть метка угрозы?", True, ctx.color_main)
-        sub = ctx.font_small.render(f"Ищи символ: {self.target_symbol}", True, ctx.color_main)
-        value = ctx.font_big.render(self.signal, True, ctx.color_accent)
+        max_text_width = ctx.rect.width - 32
+        title_lines = wrap_text("Есть метка угрозы?", ctx.font_small, max_text_width)
+        sub_lines = wrap_text(f"Ищи символ: {self.target_symbol}", ctx.font_small, max_text_width)
+        value = render_fitted_text(
+            self.signal,
+            ctx.color_accent,
+            [ctx.font_big, ctx.font_mid, ctx.font_small],
+            max_text_width,
+        )
         hint = ctx.font_small.render("F - да, J - нет", True, ctx.color_main)
 
-        # Layout is purely flow-based to avoid overlap after font/style changes.
         cursor_y = y + 24
-        screen.blit(title, (x, cursor_y))
-        cursor_y += title.get_height() + 10
+        line_gap = ctx.font_small.get_height() + 4
+        for line in title_lines[:2]:
+            title = ctx.font_small.render(line, True, ctx.color_main)
+            screen.blit(title, (x, cursor_y))
+            cursor_y += line_gap
+        cursor_y += 6
 
-        screen.blit(sub, (x, cursor_y))
-        cursor_y += sub.get_height() + 14
+        for line in sub_lines[:2]:
+            sub = ctx.font_small.render(line, True, ctx.color_main)
+            screen.blit(sub, (x, cursor_y))
+            cursor_y += line_gap
+        cursor_y += 10
 
-        value_y = min(cursor_y, bottom_y - hint.get_height() - value.get_height() - 10)
+        max_value_y = bottom_y - hint.get_height() - value.get_height() - 10
+        min_value_y = y + 24
+        if max_value_y >= cursor_y:
+            value_y = cursor_y
+        else:
+            value_y = max(min_value_y, max_value_y)
         screen.blit(value, (x, value_y))
 
-        hint_y = max(value_y + value.get_height() + 8, bottom_y - hint.get_height())
+        hint_y = min(bottom_y - hint.get_height(), value_y + value.get_height() + 8)
+        hint_y = max(hint_y, value_y + value.get_height() + 4)
         screen.blit(hint, (x, hint_y))

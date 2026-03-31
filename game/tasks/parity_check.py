@@ -3,7 +3,7 @@ import random
 import pygame
 
 from game.runtime.models import TaskSpec
-from game.tasks.base import TaskBase, TaskRenderContext
+from game.tasks.base import TaskBase, TaskRenderContext, render_fitted_text, wrap_text
 from game.tasks.input_utils import read_left_right_key
 
 
@@ -97,9 +97,24 @@ class ParityCheckTask(TaskBase):
         x = ctx.rect.x + 16
         y = ctx.rect.y + 30
         max_h = ctx.rect.height - 44
-        title = ctx.font_mid.render(self.question_text, True, ctx.color_main)
-        value = ctx.font_big.render(str(self.value), True, ctx.color_accent)
+        max_text_width = ctx.rect.width - 32
+        title_lines = wrap_text(self.question_text, ctx.font_small, max_text_width)
+        value = render_fitted_text(
+            str(self.value),
+            ctx.color_accent,
+            [ctx.font_big, ctx.font_mid, ctx.font_small],
+            max_text_width,
+        )
         hint = ctx.font_small.render("F - да, J - нет", True, ctx.color_main)
-        screen.blit(title, (x, y + min(24, max_h // 5)))
-        screen.blit(value, (x, y + min(72, max_h // 2)))
+
+        title_y = y + min(24, max_h // 5)
+        line_gap = ctx.font_small.get_height() + 4
+        for idx, line in enumerate(title_lines[:3]):
+            title = ctx.font_small.render(line, True, ctx.color_main)
+            screen.blit(title, (x, title_y + idx * line_gap))
+
+        value_y = title_y + min(72, max_h // 2)
+        if title_lines:
+            value_y = max(value_y, title_y + len(title_lines[:3]) * line_gap + 14)
+        screen.blit(value, (x, value_y))
         screen.blit(hint, (x, y + max_h - 22))

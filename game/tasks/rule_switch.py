@@ -14,7 +14,7 @@ COLORS: List[Tuple[str, Tuple[int, int, int], str]] = [
     ("blue", (70, 120, 240), "синий"),
     ("green", (80, 180, 100), "зелёный"),
     ("yellow", (230, 200, 70), "жёлтый"),
-    ("orange", (235, 140, 50), "оранжевый"),
+    ("orange", (255, 128, 24), "оранжевый"),
     ("purple", (150, 90, 220), "фиолетовый"),
     ("cyan", (70, 190, 210), "бирюзовый"),
 ]
@@ -58,11 +58,12 @@ def _draw_shape(screen: pygame.Surface, shape: str, color: Tuple[int, int, int],
         pygame.draw.polygon(screen, color, points)
         return
     if shape == "diamond":
+        half_w = max(10, int(size * 0.65))
         points = [
             (center_x, center_y - size),
-            (center_x - size, center_y),
+            (center_x - half_w, center_y),
             (center_x, center_y + size),
-            (center_x + size, center_y),
+            (center_x + half_w, center_y),
         ]
         pygame.draw.polygon(screen, color, points)
         return

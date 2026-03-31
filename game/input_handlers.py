@@ -9,7 +9,9 @@ def handle_auth_event(app, event: pygame.event.Event) -> None:
     if event.key == pygame.K_TAB:
         app.auth_focus = "password" if app.auth_focus == "username" else "username"
         return
-    if event.key in (pygame.K_F2, pygame.K_m):
+    # Keep text entry uninterrupted: plain "m" should be typed into auth fields,
+    # not interpreted as a mode toggle shortcut.
+    if event.key == pygame.K_F2:
         app.auth_mode = "register" if app.auth_mode == "login" else "login"
         app.auth_message = ""
         return
