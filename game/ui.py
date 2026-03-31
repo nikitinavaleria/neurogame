@@ -123,7 +123,6 @@ class GameUI:
         total_tasks: int,
         level: int,
         planets_visited: int,
-        adaptation_label: str = "",
     ) -> None:
         x = self.left_stats_panel.x + 16
         y = self.left_stats_panel.y + 14
@@ -135,8 +134,6 @@ class GameUI:
             f"Стабильность: {int(stability * 100)}%",
             f"Задачи: {tasks_done}/{total_tasks}",
         ]
-        if adaptation_label:
-            lines.append(adaptation_label)
         yy = y + 38
         for line in lines:
             surf = self.font_small.render(line, True, self.theme.text)

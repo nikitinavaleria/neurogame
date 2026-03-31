@@ -22,25 +22,19 @@ from game.runtime.pending_runs_store import (
     save_pending_runs as save_pending_runs_file,
 )
 from game.runtime.paths import app_data_path, bundled_data_path, bundled_resource_path
-from game.runtime.telemetry_settings import (
-    load_telemetry_settings as load_telemetry_settings_file,
-    save_telemetry_settings as save_telemetry_settings_file,
-)
+from game.runtime.telemetry_settings import load_telemetry_settings as load_telemetry_settings_file
 from game.runtime.telemetry_client import TelemetryClient
 from game.input_handlers import (
     handle_auth_event,
     handle_auth_mouse,
     handle_menu_mouse,
     handle_pause_menu_mouse,
-    handle_telemetry_event,
 )
 from game.session_metrics import (
     build_state_vector,
     compute_flight_progress,
-    compute_fatigue_trend,
     compute_zone_quality,
     compute_reward,
-    compute_switch_cost,
     count_successes,
     task_title,
 )
@@ -88,8 +82,6 @@ class GameApp:
         telemetry_url, telemetry_api_key = self._load_telemetry_settings()
         self.telemetry_url_value = telemetry_url
         self.telemetry_api_key_value = telemetry_api_key
-        self.telemetry_status_message: str = ""
-        self.telemetry_status_ok: bool = False
         self.adapt_logger = JsonlLogger(str(self.adapt_log_path))
         self.adapt_step = 0
         self.rl_model_path = self._resolve_resource_path(session.rl_model_path)
@@ -184,10 +176,6 @@ class GameApp:
         self.exit_button_rect: pygame.Rect | None = None
         self.mode_toggle_rect: pygame.Rect | None = None
         self.logout_button_rect: pygame.Rect | None = None
-        self.telemetry_url_rect: pygame.Rect | None = None
-        self.telemetry_save_rect: pygame.Rect | None = None
-        self.telemetry_check_rect: pygame.Rect | None = None
-        self.telemetry_input_focused: bool = False
         self.awaiting_run_setup: bool = True
         self.pause_between_levels: bool = True
         self.level_transition_toggle_rect: pygame.Rect | None = None
@@ -288,8 +276,6 @@ class GameApp:
                             self._handle_auth_mouse(event.pos)
                         self._handle_auth_event(event)
                     else:
-                        if self._handle_telemetry_event(event):
-                            continue
                         if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
                             if self.awaiting_run_setup:
                                 if self._has_saved_run_for_user():
@@ -698,9 +684,6 @@ class GameApp:
         self.level_transition_toggle_rect = None
         self.instructions_button_rect = None
         self.logout_button_rect = None
-        self.telemetry_url_rect = None
-        self.telemetry_save_rect = None
-        self.telemetry_check_rect = None
         self.instructions_start_rect = None
         self.instructions_close_rect = None
         self.max_level_continue_rect = None
@@ -963,72 +946,6 @@ class GameApp:
 
         hint = self.ui.font_tiny.render("Enter или Space - начать, Esc - закрыть", True, self.ui.theme.text)
         self.screen.blit(hint, (card.x + 24, card.bottom - 28))
-
-    def _render_telemetry_panel(self, top_y: int, preferred_h: int) -> None:
-        safe_top = min(top_y, self.ui.h - 100)
-        panel_h = max(88, min(preferred_h, self.ui.h - safe_top - 12))
-        panel = pygame.Rect(20, safe_top, self.ui.w - 40, panel_h)
-        pygame.draw.rect(self.screen, (15, 20, 34), panel, border_radius=10)
-        pygame.draw.rect(self.screen, self.ui.theme.border, panel, width=2, border_radius=10)
-
-        status_text, ok = self._telemetry_status_text()
-        status_color = self.ui.theme.accent if ok else self.ui.theme.alert
-        words = status_text.split()
-        lines: List[str] = []
-        current = ""
-        max_width = panel.width - 28
-        for word in words:
-            candidate = f"{current} {word}".strip()
-            if self.ui.font_tiny.size(candidate)[0] <= max_width:
-                current = candidate
-            else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
-        if not lines:
-            lines = [status_text]
-
-        title_h = self.ui.font_tiny.get_height()
-        row_h = 30
-        line_h = 18
-        status_h = max(line_h, len(lines) * line_h)
-        content_h = title_h + 8 + row_h + 10 + status_h
-        start_y = panel.y + max(8, (panel.height - content_h) // 2)
-
-        title = self.ui.font_tiny.render("Телеметрия: адрес отправки данных", True, self.ui.theme.accent)
-        self.screen.blit(title, (panel.x + 14, start_y))
-
-        check_w = max(90, self.ui.font_tiny.size("Проверить")[0] + 26)
-        save_w = max(82, self.ui.font_tiny.size("Сохранить")[0] + 24)
-        buttons_w = check_w + save_w + 18
-        row_y = start_y + title_h + 8
-        url_w = max(180, panel.width - buttons_w - 38)
-        self.telemetry_url_rect = pygame.Rect(panel.x + 14, row_y, url_w, row_h)
-        pygame.draw.rect(self.screen, (9, 12, 22), self.telemetry_url_rect, border_radius=8)
-        border = self.ui.theme.accent if self.telemetry_input_focused else self.ui.theme.border
-        pygame.draw.rect(self.screen, border, self.telemetry_url_rect, width=2, border_radius=8)
-        url_text = self.telemetry_url_value or "https://..."
-        url_color = self.ui.theme.text if self.telemetry_url_value else (140, 150, 175)
-        visible_url = url_text
-        max_url_w = self.telemetry_url_rect.width - 16
-        while self.ui.font_tiny.size(visible_url)[0] > max_url_w and len(visible_url) > 4:
-            visible_url = "..." + visible_url[4:]
-        url_surface = self.ui.font_tiny.render(visible_url, True, url_color)
-        self.screen.blit(url_surface, (self.telemetry_url_rect.x + 8, self.telemetry_url_rect.y + 5))
-
-        self.telemetry_check_rect = pygame.Rect(self.telemetry_url_rect.right + 10, row_y + 1, check_w, 28)
-        self._draw_compact_button(self.telemetry_check_rect, "Проверить", active=False)
-        self.telemetry_save_rect = pygame.Rect(self.telemetry_check_rect.right + 8, row_y + 1, save_w, 28)
-        self._draw_compact_button(self.telemetry_save_rect, "Сохранить", active=True)
-
-        line_y = row_y + row_h + 10
-        for line in lines:
-            surf = self.ui.font_tiny.render(line, True, status_color)
-            line_rect = surf.get_rect(center=(panel.centerx, line_y + surf.get_height() // 2))
-            self.screen.blit(surf, line_rect)
-            line_y += line_h
 
     def _render_auth_panel(self, rect: pygame.Rect) -> None:
         x = rect.x + 20
@@ -1355,51 +1272,6 @@ class GameApp:
             env_url=env_url,
             env_key=env_key,
         )
-
-    def _save_telemetry_settings(self, endpoint_url: str, api_key: str) -> None:
-        save_telemetry_settings_file(
-            settings_path=self.telemetry_settings_path,
-            endpoint_url=endpoint_url,
-            api_key=api_key,
-        )
-
-    def _telemetry_status_text(self) -> tuple[str, bool]:
-        url = self.telemetry_url_value.strip()
-        if not url:
-            return "Адрес не указан. Свяжитесь с тех. специалистом.", False
-        if not TelemetryClient.is_valid_endpoint(url):
-            return "Некорректный адрес. Укажите http(s)-адрес сервера.", False
-        if self.telemetry.last_error == "invalid_api_key":
-            return "Неверный API-ключ телеметрии. Проверьте NEUROGAME_API_KEY.", False
-        if self.telemetry.last_error.startswith("http_"):
-            return "Сервер телеметрии ответил ошибкой. Проверьте доступ и настройки.", False
-        if self.telemetry_status_message:
-            return self.telemetry_status_message, self.telemetry_status_ok
-        if self.telemetry.queue_size() > 0:
-            return f"Нет связи: в очереди {self.telemetry.queue_size()} событий, отправим позже.", False
-        return "Адрес настроен. Нажмите Проверить для проверки связи.", True
-
-    def _save_telemetry_url(self) -> None:
-        url = self.telemetry_url_value.strip()
-        if not TelemetryClient.is_valid_endpoint(url):
-            self.telemetry_status_message = "Некорректный адрес. Укажите http(s)-адрес."
-            self.telemetry_status_ok = False
-            return
-        self.telemetry.set_endpoint(url)
-        self.auth_store.set_backend(url, self.telemetry_api_key_value)
-        self._save_telemetry_settings(url, self.telemetry_api_key_value)
-        self.telemetry_status_message = "Адрес сохранен."
-        self.telemetry_status_ok = True
-
-    def _check_telemetry_connection(self) -> None:
-        self.telemetry.set_endpoint(self.telemetry_url_value.strip())
-        self.auth_store.set_backend(self.telemetry_url_value.strip(), self.telemetry_api_key_value)
-        ok, message = self.telemetry.check_connection()
-        self.telemetry_status_message = message
-        self.telemetry_status_ok = ok
-
-    def _handle_telemetry_event(self, event: pygame.event.Event) -> bool:
-        return handle_telemetry_event(self, event)
 
     def _pause_run(self, open_pause_menu: bool = True) -> None:
         if not self._has_resumable_run():
@@ -2005,36 +1877,6 @@ class GameApp:
             return
         self.last_task_adjustment_reason = "neutral"
 
-    def _adaptation_profile_label(self) -> str:
-        if self.tempo_offset <= -2:
-            return "Адаптация: сильно мягче"
-        if self.tempo_offset == -1:
-            return "Адаптация: мягче"
-        if self.tempo_offset == 0:
-            return "Адаптация: стабильно"
-        if self.tempo_offset == 1:
-            return "Адаптация: интенсивнее"
-        return "Адаптация: максимально интенсивно"
-
-    def _task_profile_label(self) -> str:
-        labels = {
-            "compare_codes": "Коды",
-            "sequence_memory": "Память",
-            "rule_switch": "Правила",
-            "parity_check": "Четность",
-            "radar_scan": "Радар",
-        }
-        soft = [labels[k] for k, v in self.task_offsets.items() if int(v) < 0 and k in labels]
-        hard = [labels[k] for k, v in self.task_offsets.items() if int(v) > 0 and k in labels]
-        if not soft and not hard:
-            return "Профиль задач: нейтрально"
-        chunks: List[str] = []
-        if soft:
-            chunks.append("мягче: " + ",".join(soft[:2]))
-        if hard:
-            chunks.append("сложнее: " + ",".join(hard[:2]))
-        return "Профиль задач: " + " | ".join(chunks)
-
     def _rl_warning(self) -> str:
         if self._rl_model_exists():
             return ""
@@ -2160,12 +2002,6 @@ class GameApp:
     def _task_title(task_id: str) -> str:
         return task_title(task_id)
 
-    def _encode_action(self, prev_level: int, prev_tempo: int) -> tuple:
-        delta_level = max(-1, min(1, self.current_level - prev_level))
-        delta_tempo = max(-1, min(1, self.tempo_offset - prev_tempo))
-        action_id = (delta_level + 1) * 3 + (delta_tempo + 1)
-        return action_id, delta_level, delta_tempo
-
     def _build_state(self, window: List[TaskResult]) -> list:
         g = self.current_difficulty.global_params
         return build_state_vector(
@@ -2193,14 +2029,6 @@ class GameApp:
     def _current_flight_successes(self) -> int:
         current_batch = self.results[self.batch_result_start :]
         return count_successes(current_batch)
-
-    @staticmethod
-    def _compute_fatigue_trend(window: List[TaskResult]) -> float:
-        return compute_fatigue_trend(window)
-
-    @staticmethod
-    def _compute_switch_cost(window: List[TaskResult]) -> float:
-        return compute_switch_cost(window)
 
     def _start_next_batch(self) -> None:
         batch = self.results[self.batch_result_start :]

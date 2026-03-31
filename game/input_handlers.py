@@ -57,16 +57,6 @@ def handle_menu_mouse(app, pos: tuple[int, int]) -> None:
     if app.instructions_button_rect and app.instructions_button_rect.collidepoint(pos):
         app._open_instructions()
         return
-    if app.telemetry_url_rect and app.telemetry_url_rect.collidepoint(pos):
-        app.telemetry_input_focused = True
-        return
-    app.telemetry_input_focused = False
-    if app.telemetry_check_rect and app.telemetry_check_rect.collidepoint(pos):
-        app._check_telemetry_connection()
-        return
-    if app.telemetry_save_rect and app.telemetry_save_rect.collidepoint(pos):
-        app._save_telemetry_url()
-        return
     if app.logout_button_rect and app.logout_button_rect.collidepoint(pos):
         app._logout_user()
         return
@@ -152,25 +142,3 @@ def handle_pause_menu_mouse(app, pos: tuple[int, int]) -> None:
     if app.exit_button_rect and app.exit_button_rect.collidepoint(pos):
         app._exit_app()
         return
-
-
-def handle_telemetry_event(app, event: pygame.event.Event) -> bool:
-    if not app.telemetry_input_focused:
-        return False
-    if event.type != pygame.KEYDOWN:
-        return False
-    if event.key == pygame.K_RETURN:
-        app._save_telemetry_url()
-        return True
-    if event.key == pygame.K_ESCAPE:
-        app.telemetry_input_focused = False
-        return True
-    if event.key == pygame.K_BACKSPACE:
-        app.telemetry_url_value = app.telemetry_url_value[:-1]
-        return True
-    if not event.unicode or not event.unicode.isprintable():
-        return False
-    if len(app.telemetry_url_value) >= 220:
-        return True
-    app.telemetry_url_value += event.unicode
-    return True
