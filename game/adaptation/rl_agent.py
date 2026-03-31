@@ -23,6 +23,47 @@ class RLAgent:
     model: Optional[Any] = None
     available: bool = True
 
+    @staticmethod
+    def _protective_override(state: list[float], tempo_logits: Any) -> int | None:
+        if len(state) < 6:
+            return None
+        try:
+            acc = float(state[0])
+            mean_rt = float(state[1])
+            error_streak = float(state[3])
+            fatigue_trend = float(state[5])
+        except (TypeError, ValueError):
+            return None
+
+        try:
+            import torch  # type: ignore
+            probs = torch.softmax(tempo_logits, dim=0)
+            slow_prob = float(probs[0].item())
+            neutral_prob = float(probs[1].item())
+        except Exception:
+            slow_prob = 0.0
+            neutral_prob = 0.0
+
+        severe_struggle = (
+            acc <= 0.55
+            or mean_rt >= 2400.0
+            or error_streak >= 2.0
+            or fatigue_trend >= 220.0
+        )
+        moderate_struggle = (
+            (acc <= 0.7 and mean_rt >= 1750.0)
+            or (acc <= 0.65)
+            or (mean_rt >= 2100.0)
+            or (error_streak >= 1.0 and mean_rt >= 1500.0)
+            or (fatigue_trend >= 150.0 and mean_rt >= 1700.0)
+        )
+
+        if severe_struggle:
+            return 0
+        if moderate_struggle and (neutral_prob < 0.97 or slow_prob >= 0.04):
+            return 0
+        return None
+
     def load(self, state_dim: int) -> None:
         try:
             import torch  # type: ignore
@@ -85,6 +126,9 @@ class RLAgent:
                 if self.action_space == "tempo3_task_offsets_v1" and int(logits.shape[0]) >= 18:
                     tempo_logits = logits[:3]
                     action_id = int(torch.argmax(tempo_logits).item())
+                    protective_action = self._protective_override(list(state), tempo_logits)
+                    if protective_action is not None:
+                        action_id = protective_action
                     task_deltas: dict[str, int] = {}
                     for head_idx, head_name in enumerate(self.task_heads[:5]):
                         start = 3 + head_idx * 3

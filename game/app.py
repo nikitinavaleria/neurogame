@@ -192,6 +192,9 @@ class GameApp:
         self.persist_active_run_on_exit: bool = False
         self.partial_session_end_emitted: bool = False
         self.saved_run_preview_stats: Dict[str, float] | None = None
+        self.task_struggle_streak: int = 0
+        self.task_flow_streak: int = 0
+        self.last_task_adjustment_reason: str = "neutral"
 
     @staticmethod
     def _pick_initial_window_size(target_w: int, target_h: int) -> tuple[int, int]:
@@ -372,6 +375,7 @@ class GameApp:
             new_level = prev_level
             new_tempo = self._clamp_tempo_for_level(prev_tempo + delta_tempo, prev_level)
             self._apply_task_deltas(self.rl_agent.last_task_deltas or {})
+            self._apply_task_offset_adaptation(state)
             action_id = delta_tempo + 1
             delta_level = 0
         else:
@@ -414,6 +418,7 @@ class GameApp:
             "mode": effective_mode,
             "action_space": "tempo3_task_offsets_v1",
             "task_offsets": dict(self.task_offsets),
+            "task_adjustment_reason": self.last_task_adjustment_reason,
         }
         self.adapt_logger.write(adaptation_record)
         self.telemetry.track(
@@ -1260,6 +1265,9 @@ class GameApp:
         self.pause_menu_open = False
         self.awaiting_run_setup = False
         self.partial_session_end_emitted = False
+        self.task_struggle_streak = 0
+        self.task_flow_streak = 0
+        self.last_task_adjustment_reason = "resume"
         self.last_feedback_text = "Сессия восстановлена. Нажми Старт."
         self.last_feedback_ok = True
         self.last_feedback_ms = pygame.time.get_ticks()
@@ -1312,6 +1320,9 @@ class GameApp:
         self.started = True
         self.partial_session_end_emitted = False
         self.saved_run_preview_stats = None
+        self.task_struggle_streak = 0
+        self.task_flow_streak = 0
+        self.last_task_adjustment_reason = "start"
         self._clear_saved_run()
         self.telemetry.track(
             event_type="session_start",
@@ -1559,6 +1570,78 @@ class GameApp:
             elif cur < 0:
                 cur += 1
             self.task_offsets[key] = self._clamp_task_offset(cur, self.current_level)
+
+    @staticmethod
+    def _task_adjustment_state(state: list[float]) -> tuple[bool, bool, bool]:
+        if len(state) < 6:
+            return False, False, False
+        try:
+            acc = float(state[0])
+            mean_rt = float(state[1])
+            error_streak = float(state[3])
+            fatigue_trend = float(state[5])
+        except (TypeError, ValueError):
+            return False, False, False
+
+        struggle = (
+            (acc <= 0.7 and mean_rt >= 1750.0)
+            or (acc <= 0.65)
+            or (mean_rt >= 2100.0)
+            or (error_streak >= 1.0 and mean_rt >= 1500.0)
+            or (fatigue_trend >= 150.0 and mean_rt >= 1700.0)
+        )
+        flow = (
+            acc >= 0.9
+            and mean_rt <= 1450.0
+            and error_streak <= 0.0
+            and fatigue_trend <= 90.0
+        )
+        recovered = (
+            acc >= 0.875
+            and mean_rt <= 1600.0
+            and error_streak <= 0.0
+            and fatigue_trend <= 120.0
+        )
+        return struggle, flow, recovered
+
+    def _apply_task_offset_adaptation(self, state: list[float]) -> None:
+        struggle, flow, recovered = self._task_adjustment_state(state)
+        if struggle:
+            self.task_struggle_streak += 1
+            self.task_flow_streak = 0
+            changed = False
+            for key, value in list(self.task_offsets.items()):
+                cur = int(value)
+                if cur > -1:
+                    self.task_offsets[key] = self._clamp_task_offset(cur - 1, self.current_level)
+                    changed = True
+            self.last_task_adjustment_reason = "struggle_soften" if changed else "struggle_hold"
+            return
+        self.task_struggle_streak = 0
+        if flow:
+            self.task_flow_streak += 1
+        else:
+            self.task_flow_streak = 0
+        if self.task_flow_streak >= 2:
+            changed = False
+            for key, value in list(self.task_offsets.items()):
+                cur = int(value)
+                nxt = self._clamp_task_offset(cur + 1, self.current_level)
+                if nxt != cur:
+                    self.task_offsets[key] = nxt
+                    changed = True
+            if changed:
+                self.task_flow_streak = 0
+                self.last_task_adjustment_reason = "flow_harden"
+            else:
+                self.last_task_adjustment_reason = "flow_hold"
+            return
+        if recovered:
+            before = dict(self.task_offsets)
+            self._relax_task_offsets_to_neutral()
+            self.last_task_adjustment_reason = "recovery_relax" if self.task_offsets != before else "recovery_hold"
+            return
+        self.last_task_adjustment_reason = "neutral"
 
     def _adaptation_profile_label(self) -> str:
         if self.tempo_offset <= -2:
