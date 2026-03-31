@@ -50,6 +50,53 @@ class UserAgg:
         }
 
 
+@dataclass
+class InferredSessionAgg:
+    user_id: str
+    session_id: str
+    total_tasks: int = 0
+    correct_tasks: int = 0
+    rt_sum: float = 0.0
+    rt_count: int = 0
+    last_level: int = 1
+
+    def add_task(self, payload: dict[str, Any]) -> None:
+        self.total_tasks += 1
+        self.correct_tasks += int(payload.get("correct", 0) or 0)
+        try:
+            reaction_time = float(payload.get("reaction_time", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            reaction_time = 0.0
+        if reaction_time > 0:
+            self.rt_sum += reaction_time
+            self.rt_count += 1
+        try:
+            level = int(payload.get("level", 1) or 1)
+        except (TypeError, ValueError):
+            level = 1
+        self.last_level = max(self.last_level, max(1, level))
+
+    def to_payload(self) -> dict[str, Any]:
+        accuracy = (self.correct_tasks / self.total_tasks) if self.total_tasks > 0 else 0.0
+        mean_rt = (self.rt_sum / self.rt_count) if self.rt_count > 0 else 0.0
+        return {
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "total_tasks": self.total_tasks,
+            "accuracy_total": accuracy,
+            "mean_rt": mean_rt,
+            "rt_variance": 0.0,
+            "switch_cost": 0.0,
+            "fatigue_trend": 0.0,
+            "overload_events": 0,
+            "max_level": self.last_level,
+            "last_level": self.last_level,
+            "planets_visited": 0,
+            "is_partial": 1,
+            "exit_reason": "inferred_from_task_results",
+        }
+
+
 def build_leaderboard(
     db_path: Path,
     limit: int = 100,
@@ -64,7 +111,7 @@ def build_leaderboard(
             """
             SELECT id, user_id, session_id, event_type, payload_json
             FROM events_raw
-            WHERE event_type IN ('session_end', 'session_end_partial')
+            WHERE event_type IN ('session_end', 'session_end_partial', 'task_result')
             ORDER BY id ASC
             """
         ).fetchall()
@@ -73,6 +120,7 @@ def build_leaderboard(
     # Приоритет у полного завершения (session_end) над частичным (session_end_partial).
     session_rows: dict[tuple[str, str], tuple[int, str, dict[str, Any]]] = {}
     fallback_rows: list[tuple[str, dict[str, Any]]] = []
+    inferred_sessions: dict[tuple[str, str], InferredSessionAgg] = {}
     rank = {"session_end_partial": 1, "session_end": 2}
 
     for row_id, user_id, session_id, event_type, payload_json in rows:
@@ -83,6 +131,14 @@ def build_leaderboard(
         except json.JSONDecodeError:
             payload = {}
         if not isinstance(payload, dict):
+            continue
+        if event_type == "task_result":
+            payload_sid = str(payload.get("session_id", sid)).strip()
+            if not payload_sid:
+                continue
+            key = (uid, payload_sid)
+            agg = inferred_sessions.setdefault(key, InferredSessionAgg(user_id=uid, session_id=payload_sid))
+            agg.add_task(payload)
             continue
         payload_sid = str(payload.get("session_id", "")).strip()
         if payload_sid:
@@ -107,6 +163,9 @@ def build_leaderboard(
     effective_rows: list[tuple[str, dict[str, Any]]] = [
         (uid, payload) for (uid, _sid), (_r, _event_type, payload) in session_rows.items()
     ]
+    for key, agg in inferred_sessions.items():
+        if key not in session_rows:
+            effective_rows.append((agg.user_id, agg.to_payload()))
     effective_rows.extend(fallback_rows)
 
     for uid, payload in effective_rows:

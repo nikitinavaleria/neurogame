@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -63,12 +64,68 @@ def _infer_mode(model_version: Any, payload: dict[str, Any]) -> str:
     return "baseline"
 
 
+@dataclass
+class InferredSessionAgg:
+    user_id: str
+    session_id: str
+    mode: str
+    timestamp: int
+    total_tasks: int = 0
+    correct_tasks: int = 0
+    rt_sum: float = 0.0
+    rt_count: int = 0
+    last_level: int = 1
+
+    def add_task(self, payload: dict[str, Any], ts: int, mode: str) -> None:
+        self.total_tasks += 1
+        self.correct_tasks += int(payload.get("correct", 0) or 0)
+        try:
+            reaction_time = float(payload.get("reaction_time", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            reaction_time = 0.0
+        if reaction_time > 0:
+            self.rt_sum += reaction_time
+            self.rt_count += 1
+        try:
+            level = int(payload.get("level", 1) or 1)
+        except (TypeError, ValueError):
+            level = 1
+        self.last_level = max(self.last_level, max(1, level))
+        self.timestamp = max(self.timestamp, ts)
+        self.mode = mode or self.mode
+
+    def to_record(self) -> dict[str, Any]:
+        accuracy = (self.correct_tasks / self.total_tasks) if self.total_tasks > 0 else 0.0
+        mean_rt = (self.rt_sum / self.rt_count) if self.rt_count > 0 else 0.0
+        return {
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "total_tasks": self.total_tasks,
+            "accuracy_total": accuracy,
+            "mean_rt": mean_rt,
+            "rt_variance": 0.0,
+            "switch_cost": 0.0,
+            "fatigue_trend": 0.0,
+            "overload_events": 0,
+            "max_level": self.last_level,
+            "last_level": self.last_level,
+            "planets_visited": 0,
+            "mode": self.mode,
+            "is_partial": 1,
+            "exit_reason": "inferred_from_task_results",
+            "timestamp": self.timestamp,
+            "source_event_id": None,
+        }
+
+
 def transform_raw_events(
     rows: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     event_records: list[dict[str, Any]] = []
     adaptation_records: list[dict[str, Any]] = []
     session_records: list[dict[str, Any]] = []
+    complete_sessions: set[tuple[str, str]] = set()
+    inferred_sessions: dict[tuple[str, str], InferredSessionAgg] = {}
 
     for row in rows:
         event_id = row.get("event_id")
@@ -81,11 +138,14 @@ def transform_raw_events(
         ts = parse_ts_seconds(event_ts)
 
         if event_type == "task_result":
+            record_session_id = str(payload.get("session_id", session_id) or "").strip()
+            record_user_id = str(payload.get("user_id", user_id) or "").strip()
+            mode = _infer_mode(model_version, payload)
             nested_payload = _as_dict(payload.get("payload"))
             rec = {
                 "timestamp": ts,
-                "session_id": payload.get("session_id", session_id),
-                "user_id": payload.get("user_id", user_id),
+                "session_id": record_session_id,
+                "user_id": record_user_id,
                 "batch_index": payload.get("batch_index"),
                 "batch_task_index": payload.get("batch_task_index"),
                 "task_id": payload.get("task_id"),
@@ -95,7 +155,7 @@ def transform_raw_events(
                 "adapt_state": payload.get("adapt_state"),
                 "adapt_action": payload.get("adapt_action"),
                 "adapt_reward": payload.get("adapt_reward"),
-                "mode": _infer_mode(model_version, payload),
+                "mode": mode,
                 "payload": nested_payload,
                 "response": payload.get("response"),
                 "correct": int(payload.get("correct", 0)),
@@ -104,6 +164,18 @@ def transform_raw_events(
                 "source_event_id": event_id,
             }
             event_records.append(rec)
+            if record_session_id and record_user_id:
+                key = (record_user_id, record_session_id)
+                agg = inferred_sessions.setdefault(
+                    key,
+                    InferredSessionAgg(
+                        user_id=record_user_id,
+                        session_id=record_session_id,
+                        mode=mode,
+                        timestamp=ts,
+                    ),
+                )
+                agg.add_task(rec, ts=ts, mode=mode)
             continue
 
         if event_type == "adaptation_step":
@@ -130,9 +202,11 @@ def transform_raw_events(
 
         if event_type in ("session_end", "session_end_partial"):
             is_partial = int(payload.get("is_partial", 1 if event_type == "session_end_partial" else 0))
+            record_session_id = str(payload.get("session_id", session_id) or "").strip()
+            record_user_id = str(payload.get("user_id", user_id) or "").strip()
             rec = {
-                "session_id": payload.get("session_id", session_id),
-                "user_id": payload.get("user_id", user_id),
+                "session_id": record_session_id,
+                "user_id": record_user_id,
                 "total_tasks": int(payload.get("total_tasks", 0)),
                 "accuracy_total": float(payload.get("accuracy_total", 0.0)),
                 "mean_rt": float(payload.get("mean_rt", 0.0)),
@@ -150,5 +224,11 @@ def transform_raw_events(
                 "source_event_id": event_id,
             }
             session_records.append(rec)
+            if record_session_id and record_user_id:
+                complete_sessions.add((record_user_id, record_session_id))
+
+    for key, agg in inferred_sessions.items():
+        if key not in complete_sessions:
+            session_records.append(agg.to_record())
 
     return event_records, adaptation_records, session_records

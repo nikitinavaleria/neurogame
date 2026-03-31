@@ -9,9 +9,9 @@
     "parity_check",
     "radar_scan"
   ],
-  "transitions": 45,
-  "epochs": 60,
-  "batch_size": 32,
+  "transitions": 1108,
+  "epochs": 40,
+  "batch_size": 64,
   "lr": 0.0003,
   "gamma": 0.97,
   "mode_filter": "all",
