@@ -6,6 +6,7 @@ from typing import List, Optional
 
 @dataclass
 class Transition:
+    session_id: str
     state: List[float]
     action: int
     task_actions: List[int]
@@ -134,6 +135,7 @@ def build_transitions(records: List[dict], modes: Optional[set] = None) -> List[
 
         transitions.append(
             Transition(
+                session_id=session_id,
                 state=state,
                 action=int(action),
                 task_actions=task_actions,

@@ -16,6 +16,8 @@ class RLAgent:
         "parity_check",
         "radar_scan",
     )
+    state_mean: tuple[float, ...] | None = None
+    state_std: tuple[float, ...] | None = None
     last_task_deltas: dict[str, int] | None = None
     state_dim: Optional[int] = None
     model: Optional[Any] = None
@@ -42,6 +44,12 @@ class RLAgent:
                 heads = meta.get("task_heads")
                 if isinstance(heads, list) and heads:
                     self.task_heads = tuple(str(h) for h in heads)
+                state_mean = meta.get("state_mean")
+                state_std = meta.get("state_std")
+                if isinstance(state_mean, list) and isinstance(state_std, list):
+                    if len(state_mean) == len(state_std):
+                        self.state_mean = tuple(float(x) for x in state_mean)
+                        self.state_std = tuple(max(float(x), 1e-6) for x in state_std)
             except Exception:
                 pass
         self.state_dim = state_dim
@@ -64,7 +72,13 @@ class RLAgent:
             if self.model is None:
                 self.last_task_deltas = {k: 0 for k in self.task_heads}
                 return neutral_action, 0, 0
-            x = torch.tensor([state], dtype=torch.float32)
+            input_state = list(state)
+            if self.state_mean and self.state_std and len(self.state_mean) == len(input_state):
+                input_state = [
+                    (float(value) - self.state_mean[idx]) / self.state_std[idx]
+                    for idx, value in enumerate(input_state)
+                ]
+            x = torch.tensor([input_state], dtype=torch.float32)
             with torch.no_grad():
                 logits, _ = self.model(x)
                 logits = logits.squeeze(0)
