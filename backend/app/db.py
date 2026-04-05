@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
+LEGACY_SKIPPED_PASSWORD_CHARS = ("m", "M", "ь", "Ь")
+
+
 def ensure_db(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
@@ -192,6 +195,17 @@ def register_auth_user(db_path: Path, username: str, password: str) -> tuple[boo
     return True, "ok", user_id
 
 
+def _password_hash(password: str, salt: bytes) -> bytes:
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+
+
+def _legacy_password_candidate(password: str) -> str | None:
+    trimmed = "".join(ch for ch in password if ch not in LEGACY_SKIPPED_PASSWORD_CHARS)
+    if trimmed == password:
+        return None
+    return trimmed
+
+
 def authenticate_auth_user(db_path: Path, username: str, password: str) -> tuple[bool, str, str]:
     user_id = str(username or "").strip().lower()
     if not user_id:
@@ -216,9 +230,35 @@ def authenticate_auth_user(db_path: Path, username: str, password: str) -> tuple
             expected = base64.b64decode(pwd_hash_b64)
         except Exception:
             return False, "user_data_corrupted", ""
-        got = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+        got = _password_hash(password, salt)
         if not hmac.compare_digest(got, expected):
-            return False, "invalid_password", ""
+            legacy_candidate = _legacy_password_candidate(password)
+            if legacy_candidate is None:
+                return False, "invalid_password", ""
+            legacy_hash = _password_hash(legacy_candidate, salt)
+            if not hmac.compare_digest(legacy_hash, expected):
+                return False, "invalid_password", ""
+
+            # Heal accounts created before the old "m"-key auth input bug was fixed:
+            # once the legacy password variant matches, migrate the stored hash to
+            # the password the user actually typed now.
+            new_salt = os.urandom(16)
+            new_hash = _password_hash(password, new_salt)
+            cur.execute(
+                """
+                UPDATE users_auth
+                SET salt_b64 = ?, pwd_hash_b64 = ?, last_login_at = ?
+                WHERE user_id = ?
+                """,
+                (
+                    base64.b64encode(new_salt).decode("ascii"),
+                    base64.b64encode(new_hash).decode("ascii"),
+                    int(time.time()),
+                    user_id,
+                ),
+            )
+            conn.commit()
+            return True, "ok", user_id
         cur.execute(
             "UPDATE users_auth SET last_login_at = ? WHERE user_id = ?",
             (int(time.time()), user_id),
