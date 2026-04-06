@@ -118,10 +118,12 @@ class GameApp:
         self.last_feedback_slot_index: int | None = None
         self.active_slot_index: int | None = None
         self.last_focused_token: int | None = None
+        self.input_blocked_until_ms: int = 0
         self.slot_rng = random.Random()
         self.batch_result_start: int = 0
         self.batch_index: int = 1
         self.planets_visited: int = 0
+        self.max_level_popup_shown: bool = False
         self.selected_mode = self.session.adaptation_mode
         # TEMP: for the second testing phase we route both UI modes to the model policy.
         # The toggle remains visible for users, but the effective runtime mode is forced to PPO.
@@ -253,7 +255,10 @@ class GameApp:
                         )
                     continue
                 if self.started:
-                    result = self.task_manager.handle_event(event, now_ms)
+                    if self._task_input_allowed(event, now_ms):
+                        result = self.task_manager.handle_event(event, now_ms)
+                    else:
+                        result = None
                     if result is not None:
                         self._handle_result(result)
                 else:
@@ -345,6 +350,10 @@ class GameApp:
         if result.is_timeout:
             self.last_feedback_text = "Слишком поздно"
             self.last_feedback_ok = False
+            self.input_blocked_until_ms = max(
+                self.input_blocked_until_ms,
+                self.last_feedback_ms + self.session.inter_task_pause_ms + 220,
+            )
         else:
             self.last_feedback_text = "Ответ принят" if result.correct else "Ошибка"
             self.last_feedback_ok = result.correct
@@ -468,7 +477,13 @@ class GameApp:
         focused_time_left = None
         if focused is not None:
             focused_name = self._task_title(focused.spec.task_id)
-            focused_time_left = max(0, focused.spec.deadline_ms - now_ms)
+            focused_deadline = int(getattr(focused, "deadline_ms", focused.spec.deadline_ms))
+            if focused.spec.task_id == "sequence_memory" and now_ms < int(
+                getattr(focused, "query_ready_ms", now_ms)
+            ):
+                focused_time_left = max(0, focused_deadline - int(getattr(focused, "query_ready_ms", now_ms)))
+            else:
+                focused_time_left = max(0, focused_deadline - now_ms)
         show_timeout_alert = self.last_feedback_text == "Слишком поздно" and now_ms - self.last_feedback_ms <= 900
 
         if self.started:
@@ -1371,6 +1386,7 @@ class GameApp:
             "batch_index": self.batch_index,
             "planets_visited": self.planets_visited,
             "pause_between_levels": self.pause_between_levels,
+            "max_level_popup_shown": self.max_level_popup_shown,
             "awaiting_run_setup": self.awaiting_run_setup,
             "last_feedback_text": self.last_feedback_text,
             "last_feedback_ok": self.last_feedback_ok,
@@ -1418,6 +1434,7 @@ class GameApp:
         self.batch_index = max(1, int(snapshot.get("batch_index", 1)))
         self.planets_visited = max(0, int(snapshot.get("planets_visited", 0)))
         self.pause_between_levels = bool(snapshot.get("pause_between_levels", True))
+        self.max_level_popup_shown = bool(snapshot.get("max_level_popup_shown", False))
         self.awaiting_run_setup = bool(snapshot.get("awaiting_run_setup", False))
         self.last_feedback_text = str(snapshot.get("last_feedback_text", ""))
         self.last_feedback_ok = bool(snapshot.get("last_feedback_ok", True))
@@ -1463,6 +1480,7 @@ class GameApp:
         self.last_feedback_ok = True
         self.last_feedback_ms = pygame.time.get_ticks()
         self.last_feedback_duration_ms = 2200
+        self.input_blocked_until_ms = 0
         self.active_slot_index = None
         self.last_focused_token = None
         self.telemetry.track(
@@ -1499,9 +1517,11 @@ class GameApp:
         self.batch_result_start = 0
         self.batch_index = 1
         self.planets_visited = 0
+        self.max_level_popup_shown = False
         self.stability = 0.0
         self.last_feedback_text = ""
         self.last_feedback_ok = True
+        self.input_blocked_until_ms = 0
         self.last_adapt_state = None
         self.last_adapt_action = None
         self.last_adapt_reward = None
@@ -1559,6 +1579,7 @@ class GameApp:
 
     def _open_max_level_popup(self) -> None:
         self.max_level_popup_open = True
+        self.max_level_popup_shown = True
         self.started = False
         self.pause_menu_open = False
 
@@ -2124,7 +2145,11 @@ class GameApp:
         self.last_feedback_duration_ms = 2200
         self.last_feedback_ok = True
         self._roll_motivation_phrase()
-        if completed_stage_successfully and self.current_level >= self.level_cfg.max_level:
+        if (
+            completed_stage_successfully
+            and self.current_level >= self.level_cfg.max_level
+            and not self.max_level_popup_shown
+        ):
             self.last_feedback_text = ""
             self._open_max_level_popup()
         elif self.pause_between_levels and completed_stage_successfully:
@@ -2133,3 +2158,8 @@ class GameApp:
             self.started = False
             self.pause_menu_open = False
         self._save_active_run_snapshot()
+
+    def _task_input_allowed(self, event: pygame.event.Event, now_ms: int) -> bool:
+        if now_ms >= self.input_blocked_until_ms:
+            return True
+        return event.type not in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN)

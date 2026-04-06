@@ -21,9 +21,8 @@ class SequenceMemoryTask(TaskBase):
         base_show = 900 + 200 * len(self.sequence)
         self.show_until_ms = self.created_ms + min(base_show, max_show)
         self.query_ready_ms = self.show_until_ms + spec.difficulty["retention_delay_ms"]
-        latest_query = self.deadline_ms - 200
-        if self.query_ready_ms > latest_query:
-            self.query_ready_ms = latest_query
+        answer_window_ms = max(1000, self.deadline_ms - self.created_ms)
+        self.deadline_ms = self.query_ready_ms + answer_window_ms
 
     def handle_event(self, event: pygame.event.Event, now_ms: int) -> None:
         if self.finished_ms is not None:
