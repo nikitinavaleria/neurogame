@@ -1,26 +1,36 @@
 # Analytics
 
-Папка `analytics/` нужна для оценки качества адаптации после игровых сессий.
 
-Что дает аналитика:
-- метрики по каждой сессии (точность, RT, switch cost, fatigue trend), (`analytics/metrics.py`)
-- сводку по режимам (`baseline` vs `ppo`), (`analytics/metrics.py`)
-- статистическое сравнение режимов (перестановочный тест, p-value). (`analytics/eval_adaptation.py`)
 
-## Запуск 
+## Новый рекомендуемый workflow
 
-`pipeline.py`
+1. Открыть ноутбук:
+   - `analytics/00_prepare_data.ipynb`
 
-## Что получаем
+2. Внутри ноутбука задать обычные словари:
+   - `account_to_participant`
+   - `participant_meta`
 
-При `fetch_from_backend=True`:
-- обновляется датасет с сервера:
-  - `analytics/data/events.jsonl`
-  - `analytics/data/adaptations.jsonl`
-  - `analytics/data/sessions.jsonl`
+3. Скачать сырые события прямо с сервера и собрать удобные таблицы:
+   - `raw_events.jsonl`
+   - `task_table.csv`
+   - `adaptation_table.csv`
+   - `session_table.csv`
+   - `participant_mode_table.csv`
 
-Всегда формируются отчеты:
-- `analytics/reports/session_metrics.json` — по каждой сессии,
-- `analytics/reports/mode_aggregate.json` — усреднение по режимам,
-- `analytics/reports/mode_comparison.json` — baseline vs ppo c p-value.
+4. Открыть аналитические ноутбуки:
+   - `analytics/05_1_compare_modes.ipynb`
+   - `analytics/05_2_model_behavior.ipynb`
+
+## Что делает helper-модуль
+
+Файл `analytics/notebook_utils.py` оставляет только простые функции:
+- скачать raw events с backend;
+- превратить raw events в task-level таблицу;
+- превратить raw events в adaptation-level таблицу;
+- объединить несколько аккаунтов одного участника;
+- подмешать возраст и гендер;
+- собрать session-level и participant-level таблицы;
+- посчитать простые permutation/sign-flip тесты.
+
 
