@@ -39,9 +39,6 @@ python -m training.train --data training/data/adaptations.jsonl --mode baseline
 ```
 
 
-
-
-
 ## Процесс обучения после сбора датасета
 python -m training.train --data training/data/adaptations.jsonl --out game/assets/models/ppo_agent.pt --epochs 60 --batch-size 64 --mode baseline
 
