@@ -125,9 +125,8 @@ class GameApp:
         self.planets_visited: int = 0
         self.max_level_popup_shown: bool = False
         self.selected_mode = self.session.adaptation_mode
-        # TEMP: for the second testing phase we route both UI modes to the model policy.
-        # The toggle remains visible for users, but the effective runtime mode is forced to PPO.
-        self.force_model_mode: bool = True
+        # Regular runtime behavior: the effective mode follows the user's selection.
+        self.force_model_mode: bool = False
         self.auth_store = UserAuthStore(
             str(self.users_path),
             endpoint_url=self.telemetry_url_value,
